@@ -164,7 +164,6 @@ npm install firebase-admin
 ## 📚 Documentación Relacionada
 
 - [Modelo_BDD.md](../Modelo_BDD.md) - Diseño completo de la base de datos
-- [FIRESTORE_SCHEMA.md](../FIRESTORE_SCHEMA.md) - Esquema detallado (si existe)
 
 ## 🔄 Próximas Mejoras
 
