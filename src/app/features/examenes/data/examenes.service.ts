@@ -16,7 +16,6 @@ import {
   getDocs,
 } from '@angular/fire/firestore';
 import { Observable, from } from 'rxjs';
-import { take } from 'rxjs/operators';
 import { Examen, OrdenExamen } from '../../../models';
 
 /**
@@ -153,13 +152,18 @@ export class ExamenesService {
    * For alert panel in dashboard
    */
   getExamenesConAlertas(): Observable<Examen[]> {
+    return from(this.getExamenesConAlertasAsync());
+  }
+
+  private async getExamenesConAlertasAsync(): Promise<Examen[]> {
     const ref = collection(this.firestore, this.examenesCollection);
     
     // Return exam catalog with alerts flag
     // This is a catalog of exam types, not exam results
     const q = query(ref, orderBy('nombre', 'asc'));
     
-    return collectionData(q, { idField: 'id' }) as Observable<Examen[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Examen));
   }
 
   /**
@@ -167,6 +171,10 @@ export class ExamenesService {
    * For dashboard alerts
    */
   getOrdenesConResultadosCriticos(): Observable<OrdenExamen[]> {
+    return from(this.getOrdenesConResultadosCriticosAsync());
+  }
+
+  private async getOrdenesConResultadosCriticosAsync(): Promise<OrdenExamen[]> {
     const ref = collection(this.firestore, this.ordenesCollection);
     
     // Get recent completed exams
@@ -180,7 +188,8 @@ export class ExamenesService {
       orderBy('fecha', 'desc')
     );
     
-    return collectionData(q, { idField: 'id' }) as Observable<OrdenExamen[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrdenExamen));
   }
 
   /**
@@ -244,15 +253,19 @@ export class ExamenesService {
    * Get exam orders for a patient
    */
   getOrdenesByPaciente(pacienteId: string): Observable<OrdenExamen[]> {
+    return from(this.getOrdenesByPacienteAsync(pacienteId));
+  }
+
+  private async getOrdenesByPacienteAsync(pacienteId: string): Promise<OrdenExamen[]> {
     const ref = collection(this.firestore, this.ordenesCollection);
     const q = query(
       ref,
       where('idPaciente', '==', pacienteId),
       orderBy('fecha', 'desc')
     );
-    return (collectionData(q, { idField: 'id' }) as Observable<OrdenExamen[]>).pipe(
-      take(1) // Complete after first emission for forkJoin compatibility
-    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as OrdenExamen));
   }
 
   /**

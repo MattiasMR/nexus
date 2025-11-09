@@ -101,16 +101,14 @@ export class NuevaConsultaModalComponent {
       return;
     }
 
-    // Build consultation object
+    // Build consultation object - use 'motivo' not 'motivoConsulta' to match Consulta model
     const nuevaConsulta = {
       idPaciente: this.pacienteId,
       idFichaMedica: this.fichaMedicaId,
       idProfesional: 'TEMP_PROF_001', // TODO: Replace with actual logged-in user ID (Phase 3)
       fecha: Timestamp.fromDate(new Date(this.fechaConsulta)),
-      motivoConsulta: this.motivoConsulta.trim(),
-      diagnostico: this.diagnostico.trim() || undefined,
+      motivo: this.motivoConsulta.trim(), // ← Fixed: use 'motivo' to match model
       tratamiento: this.tratamiento.trim() || undefined,
-      signosVitales: this.cleanSignosVitales(),
       observaciones: this.observaciones.trim() || undefined,
       notas: [], // Empty array for quick notes
     };

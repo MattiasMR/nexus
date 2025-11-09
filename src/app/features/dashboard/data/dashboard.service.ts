@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
   collection,
+  collectionData,
   query,
   where,
   orderBy,
@@ -95,18 +96,36 @@ export class DashboardService {
 
   /**
    * Get consultations by specialty for today
-   * Note: This is a simplified version. In production, you'd need to:
-   * 1. Add specialty field to Consulta model
-   * 2. Or join with Profesional data to get specialty
+   * Uses real data from consultations grouped by professional specialty
    */
   async getConsultasPorEspecialidad(): Promise<ConsultasPorEspecialidad[]> {
-    // TODO: Implement proper specialty tracking
-    // For now, return mock data structure
-    return [
-      { especialidad: 'Medicina General', cantidad: 0 },
-      { especialidad: 'Pediatría', cantidad: 0 },
-      { especialidad: 'Cardiología', cantidad: 0 },
-    ];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = Timestamp.fromDate(today);
+    
+    const ref = collection(this.firestore, 'consultas');
+    const q = query(
+      ref,
+      where('fecha', '>=', todayTimestamp)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    // Group by professional and count
+    // Since we don't have specialty field, we group by professional ID
+    const profesionalCounts: { [key: string]: number } = {};
+    
+    snapshot.forEach(doc => {
+      const consulta = doc.data();
+      const profId = consulta['idProfesional'] || 'General';
+      profesionalCounts[profId] = (profesionalCounts[profId] || 0) + 1;
+    });
+    
+    // Convert to array and return
+    return Object.entries(profesionalCounts).map(([especialidad, cantidad]) => ({
+      especialidad: `Profesional ${especialidad}`,
+      cantidad
+    }));
   }
 
   /**
@@ -125,15 +144,31 @@ export class DashboardService {
         pacientesConAlertas.slice(0, 5).forEach(paciente => {
           if (paciente.alertasMedicas && paciente.alertasMedicas.length > 0) {
             const alertaMasReciente = paciente.alertasMedicas[0];
+            
+            // Safely convert fecha to Date
+            let fecha: Date;
+            if (alertaMasReciente.fechaRegistro instanceof Timestamp) {
+              fecha = alertaMasReciente.fechaRegistro.toDate();
+            } else if (alertaMasReciente.fechaRegistro instanceof Date) {
+              fecha = alertaMasReciente.fechaRegistro;
+            } else if (typeof alertaMasReciente.fechaRegistro === 'string') {
+              fecha = new Date(alertaMasReciente.fechaRegistro);
+            } else {
+              fecha = new Date(); // Fallback to now
+            }
+            
+            // Validate date
+            if (isNaN(fecha.getTime())) {
+              fecha = new Date(); // Fallback if invalid
+            }
+            
             alertas.push({
               id: `paciente-${paciente.id}`,
               tipo: 'paciente',
               titulo: `Alerta: ${paciente.nombre} ${paciente.apellido}`,
               descripcion: alertaMasReciente.descripcion,
               severidad: alertaMasReciente.severidad,
-              fecha: alertaMasReciente.fechaRegistro instanceof Timestamp
-                ? alertaMasReciente.fechaRegistro.toDate()
-                : new Date(alertaMasReciente.fechaRegistro as any),
+              fecha: fecha,
               pacienteId: paciente.id,
               pacienteNombre: `${paciente.nombre} ${paciente.apellido}`,
             });
@@ -144,15 +179,31 @@ export class DashboardService {
         ordenesConAlertas.slice(0, 5).forEach(orden => {
           const alertaData = (orden as any).alerta;
           if (alertaData && alertaData.esCritico) {
+            
+            // Safely convert fecha to Date
+            let fecha: Date;
+            if (orden.fecha instanceof Timestamp) {
+              fecha = orden.fecha.toDate();
+            } else if (orden.fecha instanceof Date) {
+              fecha = orden.fecha;
+            } else if (typeof orden.fecha === 'string') {
+              fecha = new Date(orden.fecha);
+            } else {
+              fecha = new Date(); // Fallback to now
+            }
+            
+            // Validate date
+            if (isNaN(fecha.getTime())) {
+              fecha = new Date(); // Fallback if invalid
+            }
+            
             alertas.push({
               id: `orden-${orden.id}`,
               tipo: 'examen',
               titulo: `Examen crítico`,
               descripcion: alertaData.razon || 'Valores fuera de rango',
               severidad: alertaData.severidad || 'alta',
-              fecha: orden.fecha instanceof Timestamp
-                ? orden.fecha.toDate()
-                : new Date(orden.fecha as any),
+              fecha: fecha,
               pacienteId: orden.idPaciente,
             });
           }
@@ -225,30 +276,78 @@ export class DashboardService {
    */
   getRecentActivity(): Observable<ActividadReciente[]> {
     return combineLatest([
-      this.consultasService.getRecentConsultations(5),
-      // Add more streams as needed
+      this.consultasService.getRecentConsultations(10),
+      this.medicamentosService.getRecetasRecientes(10)
     ]).pipe(
-      map(([consultas]) => {
+      map(([consultas, recetas]) => {
         const actividades: ActividadReciente[] = [];
 
         // Recent consultations
         consultas.forEach(consulta => {
+          // Safely convert fecha to Date
+          let fecha: Date;
+          if (consulta.fecha instanceof Timestamp) {
+            fecha = consulta.fecha.toDate();
+          } else if (consulta.fecha instanceof Date) {
+            fecha = consulta.fecha;
+          } else if (typeof consulta.fecha === 'string') {
+            fecha = new Date(consulta.fecha);
+          } else {
+            fecha = new Date(); // Fallback to now
+          }
+          
+          // Validate date
+          if (isNaN(fecha.getTime())) {
+            fecha = new Date(); // Fallback if invalid
+          }
+          
           actividades.push({
             id: `consulta-${consulta.id}`,
             tipo: 'consulta',
             titulo: 'Consulta registrada',
             descripcion: consulta.motivo || 'Sin motivo especificado',
-            fecha: consulta.fecha instanceof Timestamp
-              ? consulta.fecha.toDate()
-              : new Date(consulta.fecha as any),
+            fecha: fecha,
             icono: 'document-text-outline',
+          });
+        });
+
+        // Recent prescriptions
+        recetas.forEach(receta => {
+          const medicamentos = receta.medicamentos && receta.medicamentos.length > 0
+            ? receta.medicamentos.map(m => m.nombreMedicamento).join(', ')
+            : 'Medicamentos varios';
+          
+          // Safely convert fecha to Date
+          let fecha: Date;
+          if (receta.fecha instanceof Timestamp) {
+            fecha = receta.fecha.toDate();
+          } else if (receta.fecha instanceof Date) {
+            fecha = receta.fecha;
+          } else if (typeof receta.fecha === 'string') {
+            fecha = new Date(receta.fecha);
+          } else {
+            fecha = new Date(); // Fallback to now
+          }
+          
+          // Validate date
+          if (isNaN(fecha.getTime())) {
+            fecha = new Date(); // Fallback if invalid
+          }
+          
+          actividades.push({
+            id: `receta-${receta.id}`,
+            tipo: 'medicamento',
+            titulo: 'Receta emitida',
+            descripcion: medicamentos,
+            fecha: fecha,
+            icono: 'medical-outline',
           });
         });
 
         // Sort by date (most recent first)
         return actividades
           .sort((a, b) => b.fecha.getTime() - a.fecha.getTime())
-          .slice(0, 10); // Top 10 activities
+          .slice(0, 15); // Top 15 activities
       })
     );
   }
@@ -293,11 +392,23 @@ export class DashboardService {
 
   /**
    * Get patients with upcoming appointments (if appointment system is implemented)
-   * Placeholder for future functionality
+   * Returns patients with recent activity as a proxy
    */
   getPacientesConCitasProximas(): Observable<any[]> {
-    // TODO: Implement when appointment system is added
-    return from(Promise.resolve([]));
+    // Since we don't have an appointment system yet,
+    // return patients with recent consultations as proxy
+    const ref = collection(this.firestore, 'consultas');
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    
+    const q = query(
+      ref,
+      where('fecha', '<=', Timestamp.fromDate(sevenDaysFromNow)),
+      orderBy('fecha', 'asc'),
+      limit(5)
+    );
+    
+    return collectionData(q, { idField: 'id' });
   }
 
   /**
@@ -309,15 +420,34 @@ export class DashboardService {
     consultas: any[];
     examenes: any[];
   }> {
+    if (!searchTerm || searchTerm.trim().length === 0) {
+      return from(Promise.resolve({
+        pacientes: [],
+        consultas: [],
+        examenes: []
+      }));
+    }
+
     return combineLatest([
       this.pacientesService.searchPacientes(searchTerm),
-      // Add more search streams as needed
+      this.consultasService.getRecentConsultations(20),
+      // Exam search would require patient context
     ]).pipe(
-      map(([pacientes]) => ({
-        pacientes,
-        consultas: [], // TODO: Implement consultation search
-        examenes: [], // TODO: Implement exam search
-      }))
+      map(([pacientes, consultas]) => {
+        // Filter consultations that match search term
+        const term = searchTerm.toLowerCase();
+        const consultasFiltered = consultas.filter(c => 
+          c.motivo?.toLowerCase().includes(term) ||
+          c.tratamiento?.toLowerCase().includes(term) ||
+          c.observaciones?.toLowerCase().includes(term)
+        );
+
+        return {
+          pacientes,
+          consultas: consultasFiltered,
+          examenes: [] // Would need patient ID to search exams
+        };
+      })
     );
   }
 }

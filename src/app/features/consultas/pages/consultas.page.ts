@@ -10,7 +10,7 @@ import {
 } from '@ionic/angular/standalone';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription, forkJoin } from 'rxjs';
+import { Subscription, firstValueFrom } from 'rxjs';
 import { Timestamp } from '@angular/fire/firestore';
 
 // Servicios Firestore
@@ -107,12 +107,18 @@ export class ConsultasPage implements OnInit, OnDestroy {
   error: string | null = null;
   patientId: string | null = null;
   
+  // Modal state guard - prevents multiple opens
+  private isModalOpen = false;
+  
   // Variable para las notas rápidas
   nuevaNota: string = '';
   
   // Edit mode
   isEditMode = false;
   editedData: any = {};
+  
+  // Timeline items - cached property instead of getter
+  timelineItems: TimelineItem[] = [];
   
   private subscriptions: Subscription[] = [];
 
@@ -127,14 +133,28 @@ export class ConsultasPage implements OnInit, OnDestroy {
     private toastCtrl: ToastController
   ) {}
 
-  ngOnInit() {
-    // Obtener el ID del paciente desde los query params
+  async ngOnInit() {
+    // Subscribe to queryParams changes to detect patient navigation
+    // This is necessary because Angular reuses the component when navigating between patients
     this.subscriptions.push(
-      this.route.queryParams.subscribe(params => {
-        this.patientId = params['patientId'];
-        if (this.patientId) {
-          this.loadPatientData(this.patientId);
-        } else {
+      this.route.queryParams.subscribe(async (params) => {
+        const newPatientId = params['patientId'];
+        
+        // Only reload if patient ID actually changed
+        if (newPatientId && newPatientId !== this.patientId) {
+          console.log(`🔄 Patient changed from ${this.patientId} to ${newPatientId}`);
+          
+          // Clear previous patient data immediately
+          this.clearPatientData();
+          
+          // Load new patient
+          this.patientId = newPatientId;
+          await this.loadPatientData(newPatientId);
+        } else if (newPatientId && !this.patientId) {
+          // First load
+          this.patientId = newPatientId;
+          await this.loadPatientData(newPatientId);
+        } else if (!newPatientId) {
           this.error = 'No se especificó el ID del paciente';
         }
       })
@@ -146,48 +166,62 @@ export class ConsultasPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Cargar todos los datos del paciente desde Firestore
+   * Clear all patient data before loading new patient
+   * Prevents showing stale data from previous patient
    */
-  loadPatientData(patientId: string) {
+  private clearPatientData() {
+    this.paciente = null;
+    this.ficha = null;
+    this.fichaId = null;
+    this.timelineItems = [];
+    this.nuevaNota = '';
+    this.isEditMode = false;
+    this.editedData = {};
+    this.error = null;
+  }
+
+  /**
+   * Cargar todos los datos del paciente desde Firestore
+   * REFACTORED: Usa async/await como patient-list.saveCreate()
+   * Patrón completamente síncrono que garantiza completion
+   */
+  async loadPatientData(patientId: string) {
     this.isLoading = true;
     this.error = null;
 
-    // Cargar datos en paralelo usando forkJoin
-    const paciente$ = this.pacientesService.getPacienteById(patientId);
-    const ficha$ = this.fichasMedicasService.getFichaByPacienteId(patientId);
-    const consultas$ = this.consultasService.getConsultasByPaciente(patientId);
-    const examenes$ = this.examenesService.getOrdenesByPaciente(patientId);
+    try {
+      // Load all data using Promise.all with firstValueFrom - ensures completion
+      const [paciente, ficha, consultas, examenes] = await Promise.all([
+        firstValueFrom(this.pacientesService.getPacienteById(patientId)),
+        firstValueFrom(this.fichasMedicasService.getFichaByPacienteId(patientId)),
+        firstValueFrom(this.consultasService.getConsultasByPaciente(patientId)),
+        firstValueFrom(this.examenesService.getOrdenesByPaciente(patientId))
+      ]);
 
-    this.subscriptions.push(
-      forkJoin({
-        paciente: paciente$,
-        ficha: ficha$,
-        consultas: consultas$,
-        examenes: examenes$
-      }).subscribe({
-        next: (data) => {
-          if (data.paciente && data.ficha) {
-            this.paciente = data.paciente;
-            this.fichaId = data.ficha.id || null;
-            this.ficha = this.buildFichaMedicaUI(
-              data.paciente,
-              data.ficha,
-              data.consultas,
-              data.examenes
-            );
-          } else {
-            console.error('Missing patient or ficha data');
-            this.error = 'No se encontró el paciente o su ficha médica';
-          }
-          this.isLoading = false;
-        },
-        error: (error) => {
-          console.error('❌ Error loading patient data:', error);
-          this.error = 'Error al cargar los datos del paciente: ' + (error.message || 'Desconocido');
-          this.isLoading = false;
-        }
-      })
-    );
+      if (!paciente || !ficha) {
+        this.error = 'No se encontró el paciente o su ficha médica';
+        this.isLoading = false;
+        return;
+      }
+
+      this.paciente = paciente;
+      this.fichaId = ficha.id || null;
+      this.ficha = this.buildFichaMedicaUI(
+        paciente,
+        ficha,
+        consultas || [],
+        examenes || []
+      );
+      
+      // Build timeline items once after loading data
+      this.buildTimelineItems();
+
+      this.isLoading = false;
+    } catch (error: any) {
+      console.error('❌ Error loading patient data:', error);
+      this.error = 'Error al cargar los datos del paciente: ' + (error?.message || 'Desconocido');
+      this.isLoading = false;
+    }
   }
 
   /**
@@ -213,29 +247,29 @@ export class ConsultasPage implements OnInit, OnDestroy {
     return {
       datosPersonales,
       alertasMedicas: [
-        // Alergias del paciente
-        ...(paciente.alergias || []).map(alergia => ({
+        // Alergias del paciente - LIMIT to prevent performance issues
+        ...(paciente.alergias || []).slice(0, 5).map(alergia => ({
           tipo: 'alergia' as const,
           descripcion: alergia,
           criticidad: 'alta' as const
         })),
-        // Enfermedades crónicas
-        ...(paciente.enfermedadesCronicas || []).map(enfermedad => ({
+        // Enfermedades crónicas - LIMIT to prevent performance issues
+        ...(paciente.enfermedadesCronicas || []).slice(0, 5).map(enfermedad => ({
           tipo: 'antecedente' as const,
           descripcion: enfermedad,
           criticidad: 'media' as const
         })),
-        // Alertas médicas
-        ...(paciente.alertasMedicas || []).map(alerta => ({
+        // Alertas médicas - LIMIT to prevent performance issues
+        ...(paciente.alertasMedicas || []).slice(0, 5).map(alerta => ({
           tipo: 'antecedente' as const,
           descripcion: alerta.descripcion,
           criticidad: (alerta.severidad === 'critica' || alerta.severidad === 'alta' 
             ? 'alta' 
             : (alerta.severidad === 'media' ? 'media' : 'baja')) as 'alta' | 'media' | 'baja'
         }))
-      ],
-      consultas: consultas.slice(0, 10), // Últimas 10 consultas
-      examenes: examenes.slice(0, 10), // Últimas 10 órdenes de examen
+      ].slice(0, 10), // HARD LIMIT: Maximum 10 alerts total
+      consultas: (consultas || []).slice(0, 5), // LIMIT: Only 5 most recent
+      examenes: (examenes || []).slice(0, 5), // LIMIT: Only 5 most recent
       historiaMedica: {
         antecedentesPersonales: ficha.antecedentes?.personales ? [ficha.antecedentes.personales] : [],
         antecedentesFamiliares: ficha.antecedentes?.familiares ? [ficha.antecedentes.familiares] : [],
@@ -359,41 +393,91 @@ export class ConsultasPage implements OnInit, OnDestroy {
 
   /**
    * Open modal to create a new consultation
+   * Guard prevents multiple simultaneous opens
    */
   async nuevaConsulta() {
+    // Prevent multiple modal opens
+    if (this.isModalOpen) {
+      console.log('Modal already open, ignoring request');
+      return;
+    }
+    
     if (!this.paciente || !this.fichaId) {
       await this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
       return;
     }
 
-    const modal = await this.modalCtrl.create({
-      component: NuevaConsultaModalComponent,
-      componentProps: {
-        pacienteId: this.paciente.id,
-        fichaMedicaId: this.fichaId,
-        pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
+    this.isModalOpen = true;
+
+    try {
+      const modal = await this.modalCtrl.create({
+        component: NuevaConsultaModalComponent,
+        componentProps: {
+          pacienteId: this.paciente.id,
+          fichaMedicaId: this.fichaId,
+          pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
+        }
+      });
+
+      await modal.present();
+
+      const { data, role } = await modal.onWillDismiss();
+
+      if (role === 'confirm' && data) {
+        await this.guardarConsulta(data);
       }
-    });
-
-    modal.present();
-
-    const { data, role } = await modal.onWillDismiss();
-
-    if (role === 'confirm' && data) {
-      await this.guardarConsulta(data);
+    } finally {
+      // Always release the lock
+      this.isModalOpen = false;
     }
   }
 
   /**
    * Save consultation to Firestore
+   * Uses async/await pattern like patient-list
    */
   private async guardarConsulta(consultaData: any) {
     try {
       const consultaId = await this.consultasService.createConsulta(consultaData);
       await this.showToast('Consulta guardada exitosamente', 'success');
       
-      // Reload the medical record to show the new consultation
-      this.refreshData();
+      // Reload consultas using async/await (no subscriptions)
+      if (this.patientId && this.ficha && this.paciente) {
+        this.isLoading = true;
+        
+        try {
+          const consultas = await firstValueFrom(
+            this.consultasService.getConsultasByPaciente(this.patientId)
+          );
+          
+          // Update consultas section of ficha
+          if (this.ficha) {
+            this.ficha.consultas = consultas
+              .sort((a, b) => {
+                const dateA = a.fecha instanceof Timestamp ? a.fecha.toDate() : new Date(a.fecha);
+                const dateB = b.fecha instanceof Timestamp ? b.fecha.toDate() : new Date(b.fecha);
+                return dateB.getTime() - dateA.getTime();
+              })
+              .slice(0, 5) // Keep limit of 5
+              .map(c => {
+                const fecha = c.fecha instanceof Timestamp ? c.fecha.toDate() : new Date(c.fecha);
+                return {
+                  ...c,
+                  hora: fecha.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+                  medico: 'Dr./Dra. Profesional',
+                  especialidad: 'Medicina General'
+                };
+              });
+            
+            // Rebuild timeline with updated consultas
+            this.buildTimelineItems();
+          }
+        } catch (err) {
+          console.error('Error reloading consultas:', err);
+        } finally {
+          this.isLoading = false;
+        }
+      }
     } catch (error) {
       console.error('Error saving consultation:', error);
       await this.showToast('Error al guardar la consulta', 'danger');
@@ -547,14 +631,18 @@ export class ConsultasPage implements OnInit, OnDestroy {
   
   /**
    * Build timeline items from consultations and exams
+   * Called explicitly instead of getter to avoid change detection overhead
    */
-  get timelineItems(): TimelineItem[] {
-    if (!this.ficha) return [];
+  private buildTimelineItems() {
+    if (!this.ficha) {
+      this.timelineItems = [];
+      return;
+    }
     
     const items: TimelineItem[] = [];
     
-    // Add consultations to timeline
-    this.ficha.consultas.forEach(consulta => {
+    // Add consultations to timeline (already limited to 5)
+    (this.ficha.consultas || []).forEach(consulta => {
       items.push({
         id: consulta.id,
         title: `Consulta - ${consulta.motivo || 'Revisión general'}`,
@@ -569,8 +657,8 @@ export class ConsultasPage implements OnInit, OnDestroy {
       });
     });
     
-    // Add exam orders to timeline
-    this.ficha.examenes.forEach(examen => {
+    // Add exam orders to timeline (already limited to 5)
+    (this.ficha.examenes || []).forEach(examen => {
       const primerExamen = examen.examenes && examen.examenes.length > 0 
         ? examen.examenes[0].nombreExamen 
         : 'Laboratorio';
@@ -589,12 +677,14 @@ export class ConsultasPage implements OnInit, OnDestroy {
       });
     });
     
-    // Sort by date (most recent first)
-    return items.sort((a, b) => {
-      const dateA = a.date instanceof Timestamp ? a.date.toDate() : a.date;
-      const dateB = b.date instanceof Timestamp ? b.date.toDate() : b.date;
-      return dateB.getTime() - dateA.getTime();
-    });
+    // Sort by date (most recent first) and limit to 10 total items
+    this.timelineItems = items
+      .sort((a, b) => {
+        const dateA = a.date instanceof Timestamp ? a.date.toDate() : a.date;
+        const dateB = b.date instanceof Timestamp ? b.date.toDate() : b.date;
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 10); // HARD LIMIT: Max 10 timeline items
   }
 
   // ============== NOTAS RÁPIDAS ==============

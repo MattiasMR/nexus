@@ -2,7 +2,6 @@ import { Injectable, inject } from '@angular/core';
 import {
   Firestore,
   collection,
-  collectionData,
   doc,
   addDoc,
   updateDoc,
@@ -15,7 +14,7 @@ import {
   getDoc,
   getDocs,
 } from '@angular/fire/firestore';
-import { Observable, map, from } from 'rxjs';
+import { Observable, from } from 'rxjs';
 import { Paciente } from '../../../models/paciente.model';
 
 /**
@@ -33,9 +32,14 @@ export class PacientesService {
    * Get all patients with real-time updates
    */
   getAllPacientes(): Observable<Paciente[]> {
+    return from(this.getAllPacientesAsync());
+  }
+
+  private async getAllPacientesAsync(): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(ref, orderBy('apellido', 'asc'));
-    return collectionData(q, { idField: 'id' }) as Observable<Paciente[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
   }
 
   /**
@@ -61,23 +65,27 @@ export class PacientesService {
    * This implementation does basic filtering
    */
   searchPacientes(searchTerm: string): Observable<Paciente[]> {
+    return from(this.searchPacientesAsync(searchTerm));
+  }
+
+  private async searchPacientesAsync(searchTerm: string): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
-    return collectionData(ref, { idField: 'id' }).pipe(
-      map((pacientes: any[]) => {
-        const term = searchTerm.toLowerCase().trim();
-        if (!term) return pacientes as Paciente[];
-        
-        return pacientes.filter((p: Paciente) => {
-          const nombreCompleto = `${p.nombre} ${p.apellido}`.toLowerCase();
-          const rut = p.rut?.toLowerCase() || '';
-          const id = p.id?.toLowerCase() || '';
-          
-          return nombreCompleto.includes(term) || 
-                 rut.includes(term) || 
-                 id.includes(term);
-        }) as Paciente[];
-      })
-    );
+    const snapshot = await getDocs(ref);
+    
+    const pacientes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (!term) return pacientes;
+    
+    return pacientes.filter((p: Paciente) => {
+      const nombreCompleto = `${p.nombre} ${p.apellido}`.toLowerCase();
+      const rut = p.rut?.toLowerCase() || '';
+      const id = p.id?.toLowerCase() || '';
+      
+      return nombreCompleto.includes(term) || 
+             rut.includes(term) || 
+             id.includes(term);
+    });
   }
 
   /**
@@ -86,31 +94,40 @@ export class PacientesService {
    * @param lastVisible Last document from previous page (for cursor-based pagination)
    */
   getPacientesPaginated(pageSize: number = 20): Observable<Paciente[]> {
+    return from(this.getPacientesPaginatedAsync(pageSize));
+  }
+
+  private async getPacientesPaginatedAsync(pageSize: number): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(
       ref,
       orderBy('apellido', 'asc'),
       limit(pageSize)
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Paciente[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
   }
 
   /**
    * Get patients with medical alerts (allergies, chronic diseases, critical conditions)
    */
   getPacientesWithAlerts(): Observable<Paciente[]> {
+    return from(this.getPacientesWithAlertsAsync());
+  }
+
+  private async getPacientesWithAlertsAsync(): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
-    return collectionData(ref, { idField: 'id' }).pipe(
-      map((pacientes: any[]) => {
-        return pacientes.filter((p: Paciente) => {
-          const hasAlergias = p.alergias && p.alergias.length > 0;
-          const hasEnfermedades = p.enfermedadesCronicas && p.enfermedadesCronicas.length > 0;
-          const hasAlertas = p.alertasMedicas && p.alertasMedicas.length > 0;
-          
-          return hasAlergias || hasEnfermedades || hasAlertas;
-        }) as Paciente[];
-      })
-    );
+    const snapshot = await getDocs(ref);
+    
+    const pacientes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
+    
+    return pacientes.filter((p: Paciente) => {
+      const hasAlergias = p.alergias && p.alergias.length > 0;
+      const hasEnfermedades = p.enfermedadesCronicas && p.enfermedadesCronicas.length > 0;
+      const hasAlertas = p.alertasMedicas && p.alertasMedicas.length > 0;
+      
+      return hasAlergias || hasEnfermedades || hasAlertas;
+    });
   }
 
   /**
@@ -210,17 +227,27 @@ export class PacientesService {
    * Get patients by gender for statistics
    */
   getPacientesByGender(gender: 'M' | 'F' | 'Otro'): Observable<Paciente[]> {
+    return from(this.getPacientesByGenderAsync(gender));
+  }
+
+  private async getPacientesByGenderAsync(gender: 'M' | 'F' | 'Otro'): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(ref, where('sexo', '==', gender));
-    return collectionData(q, { idField: 'id' }) as Observable<Paciente[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
   }
 
   /**
    * Get patients by blood type
    */
   getPacientesByBloodType(bloodType: string): Observable<Paciente[]> {
+    return from(this.getPacientesByBloodTypeAsync(bloodType));
+  }
+
+  private async getPacientesByBloodTypeAsync(bloodType: string): Promise<Paciente[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(ref, where('grupoSanguineo', '==', bloodType));
-    return collectionData(q, { idField: 'id' }) as Observable<Paciente[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paciente));
   }
 }

@@ -295,6 +295,10 @@ export class MedicamentosService {
    * Since Receta model doesn't have fechaFin, we return recent prescriptions
    */
   getRecetasRecientes(days: number = 30): Observable<Receta[]> {
+    return from(this.getRecetasRecientesAsync(days));
+  }
+
+  private async getRecetasRecientesAsync(days: number): Promise<Receta[]> {
     const ref = collection(this.firestore, this.recetasCollection);
     const pastDate = new Date();
     pastDate.setDate(pastDate.getDate() - days);
@@ -305,6 +309,7 @@ export class MedicamentosService {
       orderBy('fecha', 'desc')
     );
     
-    return collectionData(q, { idField: 'id' }) as Observable<Receta[]>;
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Receta));
   }
 }

@@ -16,7 +16,6 @@ import {
   getDocs,
 } from '@angular/fire/firestore';
 import { Observable, from } from 'rxjs';
-import { take } from 'rxjs/operators';
 import { Consulta, NotaRapida } from '../../../models/consulta.model';
 import { FichasMedicasService } from '../../fichas-medicas/data/fichas-medicas.service';
 
@@ -37,15 +36,19 @@ export class ConsultasService {
    * Ordered chronologically (most recent first)
    */
   getConsultasByPaciente(pacienteId: string): Observable<Consulta[]> {
+    return from(this.getConsultasByPacienteAsync(pacienteId));
+  }
+
+  private async getConsultasByPacienteAsync(pacienteId: string): Promise<Consulta[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(
       ref,
       where('idPaciente', '==', pacienteId),
       orderBy('fecha', 'desc')
     );
-    return (collectionData(q, { idField: 'id' }) as Observable<Consulta[]>).pipe(
-      take(1) // ✅ Complete after first emission for forkJoin
-    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Consulta));
   }
 
   /**
@@ -84,13 +87,19 @@ export class ConsultasService {
    * @param limitCount Number of recent consultations to fetch
    */
   getRecentConsultations(limitCount: number = 10): Observable<Consulta[]> {
+    return from(this.getRecentConsultationsAsync(limitCount));
+  }
+
+  private async getRecentConsultationsAsync(limitCount: number): Promise<Consulta[]> {
     const ref = collection(this.firestore, this.collectionName);
     const q = query(
       ref,
       orderBy('fecha', 'desc'),
       limit(limitCount)
     );
-    return collectionData(q, { idField: 'id' }) as Observable<Consulta[]>;
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Consulta));
   }
 
   /**
@@ -240,24 +249,23 @@ export class ConsultasService {
   }
 
   /**
-   * Get consultations grouped by specialty (requires specialty field in consultation or professional)
-   * This is a simplified version - in production, you'd query professional data too
+   * Get consultations grouped by professional
+   * Groups consultations by professional ID and counts them
    */
   async getConsultationsBySpecialty(): Promise<{ [specialty: string]: number }> {
     const ref = collection(this.firestore, this.collectionName);
     const snapshot = await getDocs(ref);
     
-    const specialties: { [key: string]: number } = {};
+    const professionals: { [key: string]: number } = {};
     
     snapshot.forEach(doc => {
       const data = doc.data() as Consulta;
-      // This would require a specialty field or join with professional data
-      // For now, we'll return a placeholder
-      const specialty = 'General'; // TODO: Implement proper specialty tracking
-      specialties[specialty] = (specialties[specialty] || 0) + 1;
+      // Group by professional ID
+      const professionalId = data.idProfesional || 'Sin asignar';
+      professionals[professionalId] = (professionals[professionalId] || 0) + 1;
     });
     
-    return specialties;
+    return professionals;
   }
 
   /**
