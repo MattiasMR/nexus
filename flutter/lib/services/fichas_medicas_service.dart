@@ -45,6 +45,24 @@ class FichasMedicasService {
         );
   }
 
+  /// Obtiene la ficha médica de un paciente específico (primera coincidencia)
+  /// Retorna null si no existe
+  Future<FichaMedica?> getFichaByPacienteId(String idPaciente) async {
+    try {
+      final querySnapshot = await _fichasRef
+          .where('idPaciente', isEqualTo: idPaciente)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        return FichaMedica.fromFirestore(querySnapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Error al obtener ficha por paciente: $e');
+    }
+  }
+
   /// Crea una nueva ficha médica
   Future<String> createFicha(FichaMedica ficha) async {
     try {
