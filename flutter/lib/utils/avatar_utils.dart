@@ -52,6 +52,7 @@ class AvatarUtils {
   /// Obtiene el color del avatar como string hexadecimal
   static String getAvatarColorHex(String name) {
     final color = getAvatarColor(name);
+    // ignore: deprecated_member_use
     return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
   }
 
@@ -72,11 +73,13 @@ class AvatarUtils {
         color: color,
         shape: BoxShape.circle,
         border: Border.all(
+          // ignore: deprecated_member_use
           color: Colors.white.withOpacity(0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(0.15),
             blurRadius: 8,
             offset: const Offset(0, 2),

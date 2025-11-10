@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../models/paciente.dart';
 import '../../services/pacientes_service.dart';
 
@@ -277,23 +276,29 @@ class _PatientFormPageState extends State<PatientFormPage> {
           const SizedBox(width: 12),
           const Text('Sexo *', style: TextStyle(fontSize: 16)),
           const Spacer(),
+          // ignore: deprecated_member_use
           Radio<String>(
             value: 'M',
             groupValue: _sexo,
+            // ignore: deprecated_member_use
             onChanged: (value) => setState(() => _sexo = value!),
           ),
           const Text('M'),
           const SizedBox(width: 8),
+          // ignore: deprecated_member_use
           Radio<String>(
             value: 'F',
             groupValue: _sexo,
+            // ignore: deprecated_member_use
             onChanged: (value) => setState(() => _sexo = value!),
           ),
           const Text('F'),
           const SizedBox(width: 8),
+          // ignore: deprecated_member_use
           Radio<String>(
             value: 'Otro',
             groupValue: _sexo,
+            // ignore: deprecated_member_use
             onChanged: (value) => setState(() => _sexo = value!),
           ),
           const Text('Otro'),
@@ -311,6 +316,7 @@ class _PatientFormPageState extends State<PatientFormPage> {
     bool required = false,
   }) {
     return DropdownButtonFormField<String>(
+      // ignore: deprecated_member_use
       value: value,
       decoration: InputDecoration(
         labelText: label + (required ? ' *' : ''),

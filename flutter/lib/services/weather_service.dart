@@ -20,6 +20,7 @@ class WeatherService {
       }
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print('Error fetching weather: $e');
       return null;
     }

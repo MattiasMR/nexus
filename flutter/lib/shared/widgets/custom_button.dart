@@ -74,11 +74,13 @@ class CustomButton extends StatelessWidget {
         ).copyWith(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
+              // ignore: deprecated_member_use
               return AppColors.primary.withOpacity(0.5);
             }
             return AppColors.primary;
           }),
           shadowColor: WidgetStateProperty.all(
+            // ignore: deprecated_member_use
             AppColors.primary.withOpacity(0.18),
           ),
           elevation: WidgetStateProperty.resolveWith((states) {
