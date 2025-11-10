@@ -40,6 +40,14 @@
       </ion-row>
     </ion-grid>
 
+    <!-- CTA Ver Pacientes -->
+    <div class="patients-cta" *ngIf="!isLoading">
+      <button type="button" class="alert-btn" (click)="goToPatients()">
+        <ion-icon name="people-outline"></ion-icon>
+        <span>Ir al listado de pacientes</span>
+      </button>
+    </div>
+
     <!-- Sección de alertas -->
     <div class="alertas-seccion" *ngIf="!isLoading">
       <header class="franja-titulo">

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   IonContent, IonGrid, IonRow, IonCol,
@@ -49,11 +49,8 @@ export class DashboardPage implements OnInit, OnDestroy {
   error: string | null = null;
   
   private subscriptions: Subscription[] = [];
-
-  constructor(
-    private router: Router,
-    private dashboardService: DashboardService
-  ) {}
+  private router = inject(Router);
+  private dashboardService = inject(DashboardService);
 
   ngOnInit() {
     this.loadDashboardData();

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, IonIcon, IonButton,
@@ -8,7 +8,7 @@ import {
   IonInput, IonSelect, IonSelectOption,
   ModalController, ToastController
 } from '@ionic/angular/standalone';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, firstValueFrom } from 'rxjs';
 import { Timestamp } from '@angular/fire/firestore';
@@ -121,17 +121,15 @@ export class ConsultasPage implements OnInit, OnDestroy {
   timelineItems: TimelineItem[] = [];
   
   private subscriptions: Subscription[] = [];
-
-  constructor(
-    private router: Router,
-    private route: ActivatedRoute,
-    private pacientesService: PacientesService,
-    private fichasMedicasService: FichasMedicasService,
-    private consultasService: ConsultasService,
-    private examenesService: ExamenesService,
-    private modalCtrl: ModalController,
-    private toastCtrl: ToastController
-  ) {}
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private pacientesService = inject(PacientesService);
+  private fichasMedicasService = inject(FichasMedicasService);
+  private consultasService = inject(ConsultasService);
+  private examenesService = inject(ExamenesService);
+  private modalCtrl = inject(ModalController);
+  private toastCtrl = inject(ToastController);
+  private document = inject(DOCUMENT);
 
   async ngOnInit() {
     // Subscribe to queryParams changes to detect patient navigation
@@ -410,13 +408,15 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.isModalOpen = true;
 
     try {
+      const presentingElement = this.document.querySelector('ion-router-outlet') as HTMLElement | null;
       const modal = await this.modalCtrl.create({
         component: NuevaConsultaModalComponent,
         componentProps: {
           pacienteId: this.paciente.id,
           fichaMedicaId: this.fichaId,
           pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
-        }
+        },
+        presentingElement: presentingElement ?? undefined
       });
 
       await modal.present();

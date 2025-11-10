@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   // Base / listas
@@ -73,12 +73,9 @@ export class PatientListPage implements OnInit, OnDestroy {
   private lastCreatedPatientId: string | null = null;
   
   private subscriptions: Subscription[] = [];
-
-  constructor(
-    private router: Router,
-    private pacientesService: PacientesService,
-    private fichasMedicasService: FichasMedicasService
-  ) {}
+  private router = inject(Router);
+  private pacientesService = inject(PacientesService);
+  private fichasMedicasService = inject(FichasMedicasService);
 
   ngOnInit() {
     this.loadPatients();

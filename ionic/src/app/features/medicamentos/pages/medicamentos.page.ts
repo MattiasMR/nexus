@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -100,16 +100,15 @@ export class MedicamentosPage implements OnInit, OnDestroy {
   searchTerm = '';
   
   private subscriptions: Subscription[] = [];
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private medicamentosService = inject(MedicamentosService);
+  private pacientesService = inject(PacientesService);
+  private modalCtrl = inject(ModalController);
+  private toastCtrl = inject(ToastController);
+  private alertCtrl = inject(AlertController);
 
-  constructor(
-    private router: Router,
-    private route: ActivatedRoute,
-    private medicamentosService: MedicamentosService,
-    private pacientesService: PacientesService,
-    private modalCtrl: ModalController,
-    private toastCtrl: ToastController,
-    private alertCtrl: AlertController
-  ) {
+  constructor() {
     addIcons({ add, create, ban, calendar, time, medical, person, warning, checkmarkCircle });
   }
 

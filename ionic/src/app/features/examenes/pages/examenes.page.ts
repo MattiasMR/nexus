@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { 
   IonContent, IonCard, IonCardHeader, IonCardTitle, IonCardContent, 
@@ -68,15 +68,14 @@ export class ExamenesPage implements OnInit, OnDestroy {
   
   private subscriptions: Subscription[] = [];
   private examSubscription: Subscription | null = null;
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private examenesService = inject(ExamenesService);
+  private pacientesService = inject(PacientesService);
+  private modalCtrl = inject(ModalController);
+  private toastCtrl = inject(ToastController);
 
-  constructor(
-    private router: Router,
-    private route: ActivatedRoute,
-    private examenesService: ExamenesService,
-    private pacientesService: PacientesService,
-    private modalCtrl: ModalController,
-    private toastCtrl: ToastController
-  ) {
+  constructor() {
     addIcons({ add, create, eye, calendar, medical, clipboard });
   }
 

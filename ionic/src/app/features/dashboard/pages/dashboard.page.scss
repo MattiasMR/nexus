@@ -438,6 +438,17 @@ ion-card.panel ion-card-content {
   padding: var(--sp-6);
 }
 
+/* ============ CTA PACIENTES ============ */
+.patients-cta {
+  margin: 1.5rem auto 1rem;
+  max-width: 640px;
+  padding: 0 1rem;
+}
+
+.patients-cta .alert-btn {
+  width: 100%;
+}
+
 /* ============ BOTÓN “VER PACIENTES” ============ */
 .alert-btn {
   width: 100%;
