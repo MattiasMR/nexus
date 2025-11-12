@@ -5,7 +5,6 @@ import '../../../models/paciente.dart';
 import '../../../models/medicamento.dart';
 import '../../../services/recetas_service.dart';
 import '../../../services/auth_service.dart';
-import '../../../utils/validators.dart';
 
 class NuevaRecetaPage extends StatefulWidget {
   static const routeName = '/nueva-receta';
