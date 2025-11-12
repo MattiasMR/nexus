@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../models/paciente.dart';
 import '../../services/pacientes_service.dart';
+import '../../utils/validators.dart';
 
 class PatientFormPage extends StatefulWidget {
   final Paciente? paciente;
@@ -83,12 +85,10 @@ class _PatientFormPageState extends State<PatientFormPage> {
               label: 'RUT',
               icon: Icons.badge,
               required: true,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'El RUT es obligatorio';
-                }
-                return null;
-              },
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9kK.\-]')),
+              ],
+              validator: Validators.rutValidator,
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -96,12 +96,10 @@ class _PatientFormPageState extends State<PatientFormPage> {
               label: 'Nombre',
               icon: Icons.person,
               required: true,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'El nombre es obligatorio';
-                }
-                return null;
-              },
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+              ],
+              validator: (value) => Validators.nameValidator(value, 'El nombre'),
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -109,12 +107,10 @@ class _PatientFormPageState extends State<PatientFormPage> {
               label: 'Apellido',
               icon: Icons.person_outline,
               required: true,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'El apellido es obligatorio';
-                }
-                return null;
-              },
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+              ],
+              validator: (value) => Validators.nameValidator(value, 'El apellido'),
             ),
             const SizedBox(height: 16),
             _buildDateField(),
@@ -127,12 +123,7 @@ class _PatientFormPageState extends State<PatientFormPage> {
               label: 'Dirección',
               icon: Icons.home,
               required: true,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'La dirección es obligatoria';
-                }
-                return null;
-              },
+              validator: Validators.addressValidator,
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -141,12 +132,11 @@ class _PatientFormPageState extends State<PatientFormPage> {
               icon: Icons.phone,
               required: true,
               keyboardType: TextInputType.phone,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'El teléfono es obligatorio';
-                }
-                return null;
-              },
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(9),
+              ],
+              validator: Validators.phoneValidator,
             ),
             const SizedBox(height: 16),
             _buildTextField(
@@ -154,6 +144,12 @@ class _PatientFormPageState extends State<PatientFormPage> {
               label: 'Email (opcional)',
               icon: Icons.email,
               keyboardType: TextInputType.emailAddress,
+              validator: (value) {
+                if (value != null && value.isNotEmpty) {
+                  return Validators.emailValidator(value);
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 24),
             _buildSectionTitle('Información Adicional'),
@@ -177,6 +173,9 @@ class _PatientFormPageState extends State<PatientFormPage> {
               controller: _ocupacionController,
               label: 'Ocupación (opcional)',
               icon: Icons.work,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+              ],
             ),
             const SizedBox(height: 16),
             _buildDropdownField(
@@ -228,10 +227,12 @@ class _PatientFormPageState extends State<PatientFormPage> {
     bool required = false,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label + (required ? ' *' : ''),
         prefixIcon: Icon(icon),

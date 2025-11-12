@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../utils/app_colors.dart';
 import '../../../models/paciente.dart';
 import '../../../models/medicamento.dart';
 import '../../../services/recetas_service.dart';
 import '../../../services/auth_service.dart';
+import '../../../utils/validators.dart';
 
 class NuevaRecetaPage extends StatefulWidget {
   static const routeName = '/nueva-receta';
@@ -183,6 +185,9 @@ class _NuevaRecetaPageState extends State<NuevaRecetaPage> {
                         TextFormField(
                           controller: _indicacionesController,
                           maxLines: 4,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(500),
+                          ],
                           decoration: const InputDecoration(
                             hintText: 'Indicaciones adicionales para el paciente...',
                             border: OutlineInputBorder(),
@@ -393,6 +398,9 @@ class _MedicamentoDialogState extends State<_MedicamentoDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _dosisController,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(100),
+              ],
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Ej: 1 comprimido',
@@ -404,6 +412,9 @@ class _MedicamentoDialogState extends State<_MedicamentoDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _frecuenciaController,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(100),
+              ],
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Ej: Cada 8 horas',
@@ -415,6 +426,9 @@ class _MedicamentoDialogState extends State<_MedicamentoDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _duracionController,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(50),
+              ],
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: 'Ej: 7 días',

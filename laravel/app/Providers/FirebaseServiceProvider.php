@@ -16,9 +16,6 @@ class FirebaseServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // Configurar certificados SSL para gRPC
-        putenv('GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=C:/grpc/roots.pem');
-        
         $this->app->singleton(Factory::class, function ($app) {
             $credentialsPath = storage_path('app/firebase-credentials.json');
             
@@ -30,10 +27,20 @@ class FirebaseServiceProvider extends ServiceProvider
                 ->withServiceAccount($credentialsPath);
         });
 
-        // Register Firestore
+        // NOTA: Firestore requiere la extensión gRPC de PHP para funcionar
+        // Como Herd Lite no incluye gRPC, Firestore está deshabilitado temporalmente
+        // Para habilitarlo, necesitas instalar PHP con la extensión gRPC
+        // 
+        // Mientras tanto, puedes usar la app Ionic/Flutter para acceder a Firestore
+        // o instalar un PHP completo con extensiones
+        
         $this->app->singleton(Firestore::class, function ($app) {
-            $factory = $app->make(Factory::class);
-            return $factory->createFirestore();
+            // Retornar null cuando gRPC no está disponible
+            if (!extension_loaded('grpc')) {
+                return null;
+            }
+            
+            return $app->make(Factory::class)->createFirestore();
         });
 
         // Register Firebase Auth

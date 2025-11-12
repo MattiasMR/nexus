@@ -38,8 +38,19 @@ Route::get('/test-firebase-simple', function () {
 // Ruta de prueba para Firebase
 Route::get('/test-firebase', function () {
     try {
-        // Configurar variable de entorno para gRPC
-        putenv('GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=C:/grpc/roots.pem');
+        // Verificar si gRPC está disponible
+        if (!extension_loaded('grpc')) {
+            return response()->json([
+                'success' => false,
+                'error' => 'gRPC extension not available',
+                'message' => 'Firestore requires the gRPC PHP extension which is not available in Herd Lite.',
+                'solution' => 'Use the Ionic/Flutter app to access Firestore data, or install PHP with gRPC extension.',
+                'php_info' => [
+                    'version' => PHP_VERSION,
+                    'extensions' => get_loaded_extensions(),
+                ],
+            ], 503);
+        }
         
         $paciente = new \App\Models\Paciente();
         $todos = $paciente->all();

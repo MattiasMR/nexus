@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/paciente.dart';
 import '../../../models/ficha_medica.dart';
 import '../../../models/consulta.dart';
@@ -6,6 +7,7 @@ import '../../../services/consultas_service.dart';
 import '../../../services/fichas_medicas_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../utils/app_colors.dart';
+import '../../../utils/validators.dart';
 import 'package:intl/intl.dart';
 
 /// Formulario de registro de nueva atención médica (consulta)
@@ -207,16 +209,14 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
           TextFormField(
             controller: _motivoController,
             maxLines: 3,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(500),
+            ],
             decoration: const InputDecoration(
               hintText: 'Describa el motivo principal de la consulta...',
               border: OutlineInputBorder(),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'El motivo de consulta es requerido';
-              }
-              return null;
-            },
+            validator: (value) => Validators.minLengthValidator(value, 10, 'El motivo de consulta'),
           ),
           const SizedBox(height: 24),
           
@@ -229,10 +229,14 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
           TextFormField(
             controller: _sintomasController,
             maxLines: 4,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(1000),
+            ],
             decoration: const InputDecoration(
               hintText: 'Describa los síntomas que presenta el paciente...',
               border: OutlineInputBorder(),
             ),
+            validator: (value) => Validators.safeTextValidator(value, 'Los síntomas'),
           ),
           const SizedBox(height: 24),
           
@@ -247,11 +251,26 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
               Expanded(
                 child: TextFormField(
                   controller: _presionController,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+                    LengthLimitingTextInputFormatter(7), // 120/80
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Presión Arterial',
                     hintText: '120/80',
                     border: OutlineInputBorder(),
                   ),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      final parts = value.split('/');
+                      if (parts.length != 2 || 
+                          int.tryParse(parts[0]) == null || 
+                          int.tryParse(parts[1]) == null) {
+                        return 'Formato inválido (ej: 120/80)';
+                      }
+                    }
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -259,11 +278,24 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
                 child: TextFormField(
                   controller: _frecuenciaController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Frecuencia (bpm)',
                     hintText: '75',
                     border: OutlineInputBorder(),
                   ),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      final num = int.tryParse(value);
+                      if (num == null || num < 30 || num > 220) {
+                        return 'Rango 30-220 bpm';
+                      }
+                    }
+                    return null;
+                  },
                 ),
               ),
             ],
@@ -275,11 +307,24 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
                 child: TextFormField(
                   controller: _temperaturaController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    LengthLimitingTextInputFormatter(4), // 36.5
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'Temperatura (°C)',
                     hintText: '36.5',
                     border: OutlineInputBorder(),
                   ),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      final num = double.tryParse(value);
+                      if (num == null || num < 33.0 || num > 43.0) {
+                        return 'Rango 33-43°C';
+                      }
+                    }
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -287,11 +332,24 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
                 child: TextFormField(
                   controller: _saturacionController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
                   decoration: const InputDecoration(
                     labelText: 'SpO₂ (%)',
                     hintText: '98',
                     border: OutlineInputBorder(),
                   ),
+                  validator: (value) {
+                    if (value != null && value.isNotEmpty) {
+                      final num = int.tryParse(value);
+                      if (num == null || num < 70 || num > 100) {
+                        return 'Rango 70-100%';
+                      }
+                    }
+                    return null;
+                  },
                 ),
               ),
             ],
@@ -315,16 +373,14 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
           TextFormField(
             controller: _diagnosticoController,
             maxLines: 3,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(500),
+            ],
             decoration: const InputDecoration(
               hintText: 'Ingrese el diagnóstico principal...',
               border: OutlineInputBorder(),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'El diagnóstico es requerido';
-              }
-              return null;
-            },
+            validator: (value) => Validators.minLengthValidator(value, 5, 'El diagnóstico'),
           ),
           const SizedBox(height: 24),
           
@@ -336,10 +392,14 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
           TextFormField(
             controller: _observacionesController,
             maxLines: 5,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(1000),
+            ],
             decoration: const InputDecoration(
               hintText: 'Notas adicionales, hallazgos, etc...',
               border: OutlineInputBorder(),
             ),
+            validator: (value) => Validators.safeTextValidator(value, 'Las observaciones'),
           ),
         ],
       ),
@@ -360,10 +420,14 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
           TextFormField(
             controller: _planController,
             maxLines: 6,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(2000),
+            ],
             decoration: const InputDecoration(
               hintText: 'Describa el plan de tratamiento, medicamentos, indicaciones, etc...',
               border: OutlineInputBorder(),
             ),
+            validator: (value) => Validators.minLengthValidator(value, 10, 'El plan de tratamiento'),
           ),
           const SizedBox(height: 24),
           

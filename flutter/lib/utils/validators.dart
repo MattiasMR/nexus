@@ -99,4 +99,185 @@ class Validators {
     if (value == null || value.isEmpty) return false;
     return int.tryParse(value) != null;
   }
+
+  // ============================================
+  // VALIDADORES PARA TextFormField
+  // ============================================
+
+  /// Validador de campo requerido
+  static String? required(String? value, [String fieldName = 'Este campo']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+    return null;
+  }
+
+  /// Validador de RUT para TextFormField
+  static String? rutValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'El RUT es requerido';
+    }
+    if (!validateRut(value)) {
+      return 'RUT inválido';
+    }
+    return null;
+  }
+
+  /// Validador de email para TextFormField
+  static String? emailValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'El correo es requerido';
+    }
+    if (!validateEmail(value)) {
+      return 'Ingrese un correo válido';
+    }
+    return null;
+  }
+
+  /// Validador de teléfono para TextFormField
+  static String? phoneValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'El teléfono es requerido';
+    }
+    if (!validatePhone(value)) {
+      return 'Ingrese un teléfono válido (9 dígitos)';
+    }
+    return null;
+  }
+
+  /// Validador de nombre (solo letras y espacios)
+  static String? nameValidator(String? value, [String fieldName = 'El nombre']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+
+    final nameRegex = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$');
+    if (!nameRegex.hasMatch(value.trim())) {
+      return '$fieldName solo puede contener letras';
+    }
+
+    if (value.trim().length < 2) {
+      return '$fieldName debe tener al menos 2 caracteres';
+    }
+
+    return null;
+  }
+
+  /// Validador de dirección
+  static String? addressValidator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'La dirección es requerida';
+    }
+
+    // Permitir letras, números, espacios, comas, puntos, guiones y #
+    final addressRegex = RegExp(r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s,.\-#]+$');
+    if (!addressRegex.hasMatch(value.trim())) {
+      return 'La dirección contiene caracteres no válidos';
+    }
+
+    if (value.trim().length < 5) {
+      return 'La dirección debe tener al menos 5 caracteres';
+    }
+
+    return null;
+  }
+
+  /// Validador de texto sin caracteres especiales peligrosos
+  static String? safeTextValidator(String? value, [String fieldName = 'Este campo']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+
+    // No permitir caracteres potencialmente peligrosos
+    final dangerousChars = RegExp(r'[<>{};\[\]\\]');
+    if (dangerousChars.hasMatch(value)) {
+      return '$fieldName contiene caracteres no permitidos';
+    }
+
+    return null;
+  }
+
+  /// Validador de número positivo
+  static String? positiveNumberValidator(String? value, [String fieldName = 'Este campo']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+
+    final num = double.tryParse(value.trim());
+    if (num == null) {
+      return '$fieldName debe ser un número válido';
+    }
+
+    if (num <= 0) {
+      return '$fieldName debe ser mayor a 0';
+    }
+
+    return null;
+  }
+
+  /// Validador de longitud mínima
+  static String? minLengthValidator(String? value, int min, [String fieldName = 'Este campo']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+
+    if (value.trim().length < min) {
+      return '$fieldName debe tener al menos $min caracteres';
+    }
+
+    return null;
+  }
+
+  /// Validador de longitud máxima
+  static String? maxLengthValidator(String? value, int max, [String fieldName = 'Este campo']) {
+    if (value == null) return null;
+
+    if (value.trim().length > max) {
+      return '$fieldName no puede exceder $max caracteres';
+    }
+
+    return null;
+  }
+
+  /// Combina múltiples validadores
+  static String? Function(String?) combine(List<String? Function(String?)> validators) {
+    return (String? value) {
+      for (final validator in validators) {
+        final result = validator(value);
+        if (result != null) {
+          return result;
+        }
+      }
+      return null;
+    };
+  }
+
+  /// Validador de código CIE-10
+  static String? cie10Validator(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'El código CIE-10 es requerido';
+    }
+
+    // Formato CIE-10: 1 letra seguida de 2-3 números, opcionalmente seguido de punto y 1-2 dígitos
+    final cie10Regex = RegExp(r'^[A-Z]\d{2,3}(\.\d{1,2})?$');
+    if (!cie10Regex.hasMatch(value.trim().toUpperCase())) {
+      return 'Código CIE-10 inválido (ej: J00, A09.9)';
+    }
+
+    return null;
+  }
+
+  /// Validador de texto alfanumérico
+  static String? alphanumericValidator(String? value, [String fieldName = 'Este campo']) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName es requerido';
+    }
+
+    final alphanumericRegex = RegExp(r'^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]+$');
+    if (!alphanumericRegex.hasMatch(value.trim())) {
+      return '$fieldName solo puede contener letras y números';
+    }
+
+    return null;
+  }
 }

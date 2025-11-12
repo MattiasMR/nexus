@@ -7,12 +7,21 @@ use Kreait\Firebase\Contract\Firestore;
 
 class Paciente
 {
-    protected Firestore $firestore;
+    protected ?Firestore $firestore;
     protected string $collection = 'pacientes';
 
     public function __construct()
     {
         $this->firestore = app(Firestore::class);
+        
+        // Si Firestore no está disponible (gRPC no instalado), lanzar excepción clara
+        if ($this->firestore === null) {
+            throw new \Exception(
+                'Firestore no está disponible. La extensión gRPC de PHP no está instalada. ' .
+                'Para usar Firestore, necesitas instalar PHP con la extensión gRPC. ' .
+                'Mientras tanto, usa la aplicación Ionic/Flutter para acceder a los datos de Firebase.'
+            );
+        }
     }
 
     /**
