@@ -10,9 +10,9 @@ class Consulta
     protected Firestore $firestore;
     protected string $collection = 'consultas';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**
@@ -20,21 +20,26 @@ class Consulta
      */
     public function all(): array
     {
-        $documents = $this->firestore
-            ->database()
-            ->collection($this->collection)
-            ->documents();
+        try {
+            $documents = $this->firestore
+                ->database()
+                ->collection($this->collection)
+                ->documents();
 
-        $consultas = [];
-        foreach ($documents as $document) {
-            if ($document->exists()) {
-                $data = $document->data();
-                $data['id'] = $document->id();
-                $consultas[] = $this->formatDates($data);
+            $consultas = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $consultas[] = $this->formatDates($data);
+                }
             }
-        }
 
-        return $consultas;
+            return $consultas;
+        } catch (\Exception $e) {
+            logger()->error('Error fetching consultas from Firestore: ' . $e->getMessage());
+            throw new \Exception('No se pudo conectar con Firestore. Verifica tu conexión a Internet y las credenciales de Firebase.');
+        }
     }
 
     /**

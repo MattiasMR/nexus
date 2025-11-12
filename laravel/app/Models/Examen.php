@@ -10,9 +10,9 @@ class Examen
     protected Firestore $firestore;
     protected string $collection = 'examenes';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**

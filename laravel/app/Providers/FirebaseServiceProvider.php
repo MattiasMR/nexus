@@ -23,24 +23,51 @@ class FirebaseServiceProvider extends ServiceProvider
                 throw new \Exception("Firebase credentials file not found at: {$credentialsPath}");
             }
 
+            // Configurar variables de entorno para gRPC
+            putenv('GOOGLE_APPLICATION_CREDENTIALS=' . $credentialsPath);
+            putenv('SUPPRESS_GCLOUD_CREDS_WARNING=true');
+            
             return (new Factory)
                 ->withServiceAccount($credentialsPath);
         });
 
-        // NOTA: Firestore requiere la extensión gRPC de PHP para funcionar
-        // Como Herd Lite no incluye gRPC, Firestore está deshabilitado temporalmente
-        // Para habilitarlo, necesitas instalar PHP con la extensión gRPC
-        // 
-        // Mientras tanto, puedes usar la app Ionic/Flutter para acceder a Firestore
-        // o instalar un PHP completo con extensiones
-        
+        // Register Firebase Firestore - usar REST en Windows para evitar recursión infinita
         $this->app->singleton(Firestore::class, function ($app) {
-            // Retornar null cuando gRPC no está disponible
-            if (!extension_loaded('grpc')) {
-                return null;
+            try {
+                $credentialsPath = storage_path('app/firebase-credentials.json');
+                
+                // En Windows, usar REST transport para evitar recursión infinita de gRPC
+                $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+                
+                $config = [
+                    'keyFilePath' => $credentialsPath,
+                    'projectId' => config('firebase.project_id', 'nexus-68994'),
+                ];
+                
+                if ($isWindows) {
+                    // Forzar REST transport en Windows
+                    $config['transport'] = 'rest';
+                }
+                
+                $firestoreClient = new FirestoreClient($config);
+                
+                // Crear un wrapper compatible con Kreait
+                return new class($firestoreClient) implements Firestore {
+                    private FirestoreClient $client;
+                    
+                    public function __construct(FirestoreClient $client) {
+                        $this->client = $client;
+                    }
+                    
+                    public function database(): FirestoreClient {
+                        return $this->client;
+                    }
+                };
+                
+            } catch (\Exception $e) {
+                logger()->error('Failed to initialize Firestore: ' . $e->getMessage());
+                throw new \Exception('Firestore initialization failed: ' . $e->getMessage());
             }
-            
-            return $app->make(Factory::class)->createFirestore();
         });
 
         // Register Firebase Auth

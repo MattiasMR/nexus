@@ -42,4 +42,23 @@ return [
     |
     */
     'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Firestore Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for Firestore gRPC client
+    |
+    */
+    'firestore' => [
+        // Timeout en segundos para operaciones de Firestore
+        'timeout' => env('FIRESTORE_TIMEOUT', 30),
+        
+        // Número máximo de reintentos
+        'max_retries' => env('FIRESTORE_MAX_RETRIES', 0),
+        
+        // Tiempo entre reintentos en milisegundos
+        'retry_delay' => env('FIRESTORE_RETRY_DELAY', 1000),
+    ],
 ];

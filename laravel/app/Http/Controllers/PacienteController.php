@@ -11,9 +11,9 @@ class PacienteController extends Controller
 {
     protected Paciente $pacienteModel;
 
-    public function __construct()
+    public function __construct(Paciente $pacienteModel)
     {
-        $this->pacienteModel = new Paciente();
+        $this->pacienteModel = $pacienteModel;
     }
 
     /**

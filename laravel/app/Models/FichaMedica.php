@@ -10,9 +10,9 @@ class FichaMedica
     protected Firestore $firestore;
     protected string $collection = 'fichasMedicas';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**
@@ -20,21 +20,26 @@ class FichaMedica
      */
     public function all(): array
     {
-        $documents = $this->firestore
-            ->database()
-            ->collection($this->collection)
-            ->documents();
+        try {
+            $documents = $this->firestore
+                ->database()
+                ->collection($this->collection)
+                ->documents();
 
-        $fichas = [];
-        foreach ($documents as $document) {
-            if ($document->exists()) {
-                $data = $document->data();
-                $data['id'] = $document->id();
-                $fichas[] = $this->formatDates($data);
+            $fichas = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $fichas[] = $this->formatDates($data);
+                }
             }
-        }
 
-        return $fichas;
+            return $fichas;
+        } catch (\Exception $e) {
+            logger()->error('Error fetching fichas medicas from Firestore: ' . $e->getMessage());
+            throw new \Exception('No se pudo conectar con Firestore. Verifica tu conexión a Internet y las credenciales de Firebase.');
+        }
     }
 
     /**

@@ -45,37 +45,40 @@ Route::get('/test-firebase-simple', function () {
     }
 });
 
-// Ruta de prueba para Firebase
+// Ruta de prueba para Firebase/Firestore
 Route::get('/test-firebase', function () {
     try {
-        // Verificar si gRPC está disponible
-        if (!extension_loaded('grpc')) {
-            return response()->json([
-                'success' => false,
-                'error' => 'gRPC extension not available',
-                'message' => 'Firestore requires the gRPC PHP extension which is not available in Herd Lite.',
-                'solution' => 'Use the Ionic/Flutter app to access Firestore data, or install PHP with gRPC extension.',
-                'php_info' => [
-                    'version' => PHP_VERSION,
-                    'extensions' => get_loaded_extensions(),
-                ],
-            ], 503);
-        }
+        // Obtener información sobre extensiones disponibles
+        $grpcLoaded = extension_loaded('grpc');
+        $sodiumLoaded = extension_loaded('sodium');
         
+        // Intentar conectar a Firestore
         $paciente = new \App\Models\Paciente();
         $todos = $paciente->all();
         
         return response()->json([
             'success' => true,
-            'message' => 'Conexión a Firebase exitosa',
+            'message' => 'Conexión a Firestore exitosa',
+            'connection_type' => $grpcLoaded ? 'gRPC (optimizado)' : 'REST API',
             'total_pacientes' => count($todos),
             'pacientes' => $todos,
+            'php_info' => [
+                'version' => PHP_VERSION,
+                'grpc_available' => $grpcLoaded,
+                'sodium_available' => $sodiumLoaded,
+            ],
         ]);
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,
             'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
+            'trace' => config('app.debug') ? $e->getTraceAsString() : null,
+            'php_info' => [
+                'version' => PHP_VERSION,
+                'grpc_available' => extension_loaded('grpc'),
+                'sodium_available' => extension_loaded('sodium'),
+            ],
+            'help' => 'Si ves este error, revisa INSTALAR_GRPC.md para instrucciones de instalación.',
         ], 500);
     }
 });

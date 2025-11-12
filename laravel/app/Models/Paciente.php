@@ -7,21 +7,12 @@ use Kreait\Firebase\Contract\Firestore;
 
 class Paciente
 {
-    protected ?Firestore $firestore;
+    protected Firestore $firestore;
     protected string $collection = 'pacientes';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
-        
-        // Si Firestore no está disponible (gRPC no instalado), lanzar excepción clara
-        if ($this->firestore === null) {
-            throw new \Exception(
-                'Firestore no está disponible. La extensión gRPC de PHP no está instalada. ' .
-                'Para usar Firestore, necesitas instalar PHP con la extensión gRPC. ' .
-                'Mientras tanto, usa la aplicación Ionic/Flutter para acceder a los datos de Firebase.'
-            );
-        }
+        $this->firestore = $firestore;
     }
 
     /**
@@ -29,21 +20,26 @@ class Paciente
      */
     public function all(): array
     {
-        $documents = $this->firestore
-            ->database()
-            ->collection($this->collection)
-            ->documents();
+        try {
+            $documents = $this->firestore
+                ->database()
+                ->collection($this->collection)
+                ->documents();
 
-        $pacientes = [];
-        foreach ($documents as $document) {
-            if ($document->exists()) {
-                $data = $document->data();
-                $data['id'] = $document->id();
-                $pacientes[] = $this->formatDates($data);
+            $pacientes = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $pacientes[] = $this->formatDates($data);
+                }
             }
-        }
 
-        return $pacientes;
+            return $pacientes;
+        } catch (\Exception $e) {
+            logger()->error('Error fetching all patients from Firestore: ' . $e->getMessage());
+            throw new \Exception('No se pudo conectar con Firestore. Verifica tu conexión a Internet y las credenciales de Firebase.');
+        }
     }
 
     /**
@@ -97,10 +93,7 @@ class Paciente
         $data['updatedAt'] = now()->toDateTime();
         $data['nombreCompleto'] = ($data['nombre'] ?? '') . ' ' . ($data['apellido'] ?? '');
 
-        $docRef = $this->firestore
-            ->database()
-            ->collection($this->collection)
-            ->add($data);
+        $docRef = $this->collection()->add($data);
 
         return $docRef->id();
     }
@@ -119,9 +112,7 @@ class Paciente
             $data['nombreCompleto'] = $nombre . ' ' . $apellido;
         }
 
-        $this->firestore
-            ->database()
-            ->collection($this->collection)
+        $this->collection()
             ->document($id)
             ->update($data);
 
@@ -133,9 +124,7 @@ class Paciente
      */
     public function delete(string $id): bool
     {
-        $this->firestore
-            ->database()
-            ->collection($this->collection)
+        $this->collection()
             ->document($id)
             ->delete();
 

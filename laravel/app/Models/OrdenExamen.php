@@ -7,12 +7,12 @@ use Kreait\Firebase\Contract\Firestore;
 
 class OrdenExamen
 {
-    protected Firestore $firestore;
+    protected $firestore;
     protected string $collection = 'ordenesExamenes';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**

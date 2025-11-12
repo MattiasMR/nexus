@@ -10,9 +10,9 @@ class Receta
     protected Firestore $firestore;
     protected string $collection = 'recetas';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**

@@ -14,23 +14,41 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    protected Paciente $pacienteModel;
+    protected FichaMedica $fichaMedicaModel;
+    protected Consulta $consultaModel;
+    protected Hospitalizacion $hospitalizacionModel;
+    protected OrdenExamen $ordenExamenModel;
+
+    public function __construct(
+        Paciente $pacienteModel,
+        FichaMedica $fichaMedicaModel,
+        Consulta $consultaModel,
+        Hospitalizacion $hospitalizacionModel,
+        OrdenExamen $ordenExamenModel
+    ) {
+        $this->pacienteModel = $pacienteModel;
+        $this->fichaMedicaModel = $fichaMedicaModel;
+        $this->consultaModel = $consultaModel;
+        $this->hospitalizacionModel = $hospitalizacionModel;
+        $this->ordenExamenModel = $ordenExamenModel;
+    }
+
     /**
      * Muestra el dashboard principal del sistema médico
      */
     public function index(): Response
     {
         try {
-            // Instanciar modelos
-            $pacienteModel = new Paciente();
-            $fichaMedicaModel = new FichaMedica();
-            $consultaModel = new Consulta();
-            $hospitalizacionModel = new Hospitalizacion();
-            $ordenExamenModel = new OrdenExamen();
+            // Obtener datos usando los modelos inyectados
+            $pacientes = $this->pacienteModel->all();
+            $fichasMedicas = $this->fichaMedicaModel->all();
+            $consultas = $this->consultaModel->all();
 
-            // Obtener datos
-            $pacientes = $pacienteModel->all();
-            $fichasMedicas = $fichaMedicaModel->all();
-            $consultas = $consultaModel->all();
+            // Obtener datos usando los modelos inyectados
+            $pacientes = $this->pacienteModel->all();
+            $fichasMedicas = $this->fichaMedicaModel->all();
+            $consultas = $this->consultaModel->all();
 
             // KPI 1: Total de pacientes activos
             $totalPacientes = count($pacientes);
@@ -74,7 +92,7 @@ class DashboardController extends Controller
             // KPI 6: Hospitalizaciones activas
             $hospitalizacionesActivas = 0;
             try {
-                $hospitalizaciones = $hospitalizacionModel->findActivas();
+                $hospitalizaciones = $this->hospitalizacionModel->findActivas();
                 $hospitalizacionesActivas = count($hospitalizaciones);
             } catch (\Exception $e) {
                 // Si no hay hospitalizaciones, se mantiene en 0
@@ -83,7 +101,7 @@ class DashboardController extends Controller
             // KPI 7: Exámenes pendientes
             $examenesPendientes = 0;
             try {
-                $ordenesPendientes = $ordenExamenModel->findByEstado('pendiente');
+                $ordenesPendientes = $this->ordenExamenModel->findByEstado('pendiente');
                 $examenesPendientes = count($ordenesPendientes);
             } catch (\Exception $e) {
                 // Si no hay órdenes, se mantiene en 0
@@ -175,7 +193,7 @@ class DashboardController extends Controller
                 $paciente = null;
                 if (isset($consulta['pacienteId'])) {
                     try {
-                        $paciente = $pacienteModel->find($consulta['pacienteId']);
+                        $paciente = $this->pacienteModel->find($consulta['pacienteId']);
                     } catch (\Exception $e) {
                         // Paciente no encontrado
                     }

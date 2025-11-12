@@ -10,9 +10,9 @@ class Medicamento
     protected Firestore $firestore;
     protected string $collection = 'medicamentos';
 
-    public function __construct()
+    public function __construct(Firestore $firestore)
     {
-        $this->firestore = app(Firestore::class);
+        $this->firestore = $firestore;
     }
 
     /**
