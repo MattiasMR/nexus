@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Paciente;
+use App\Models\FichaMedica;
 use App\Models\Consulta;
+use App\Models\Hospitalizacion;
+use App\Models\OrdenExamen;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,115 +20,196 @@ class DashboardController extends Controller
     public function index(): Response
     {
         try {
+            // Instanciar modelos
             $pacienteModel = new Paciente();
+            $fichaMedicaModel = new FichaMedica();
             $consultaModel = new Consulta();
+            $hospitalizacionModel = new Hospitalizacion();
+            $ordenExamenModel = new OrdenExamen();
 
-            // Obtener todos los pacientes
+            // Obtener datos
             $pacientes = $pacienteModel->all();
+            $fichasMedicas = $fichaMedicaModel->all();
+            $consultas = $consultaModel->all();
+
+            // KPI 1: Total de pacientes activos
             $totalPacientes = count($pacientes);
 
-            // Contar alertas críticas (pacientes con alertas de alta severidad)
+            // KPI 2: Total de fichas médicas creadas
+            $totalFichas = count($fichasMedicas);
+
+            // KPI 3: Fichas creadas este mes
+            $fichasEsteMes = 0;
+            foreach ($fichasMedicas as $ficha) {
+                if (isset($ficha['fechaCreacion'])) {
+                    $fechaCreacion = Carbon::parse($ficha['fechaCreacion']);
+                    if ($fechaCreacion->isCurrentMonth()) {
+                        $fichasEsteMes++;
+                    }
+                }
+            }
+
+            // KPI 4: Atenciones del día (consultas hoy)
+            $atencionesHoy = 0;
+            foreach ($consultas as $consulta) {
+                if (isset($consulta['fecha'])) {
+                    $fechaConsulta = Carbon::parse($consulta['fecha']);
+                    if ($fechaConsulta->isToday()) {
+                        $atencionesHoy++;
+                    }
+                }
+            }
+
+            // KPI 5: Atenciones del mes
+            $atencionesMes = 0;
+            foreach ($consultas as $consulta) {
+                if (isset($consulta['fecha'])) {
+                    $fechaConsulta = Carbon::parse($consulta['fecha']);
+                    if ($fechaConsulta->isCurrentMonth()) {
+                        $atencionesMes++;
+                    }
+                }
+            }
+
+            // KPI 6: Hospitalizaciones activas
+            $hospitalizacionesActivas = 0;
+            try {
+                $hospitalizaciones = $hospitalizacionModel->findActivas();
+                $hospitalizacionesActivas = count($hospitalizaciones);
+            } catch (\Exception $e) {
+                // Si no hay hospitalizaciones, se mantiene en 0
+            }
+
+            // KPI 7: Exámenes pendientes
+            $examenesPendientes = 0;
+            try {
+                $ordenesPendientes = $ordenExamenModel->findByEstado('pendiente');
+                $examenesPendientes = count($ordenesPendientes);
+            } catch (\Exception $e) {
+                // Si no hay órdenes, se mantiene en 0
+            }
+
+            // KPI 8: Alertas críticas
             $alertasCriticas = 0;
+            $pacientesConAlertas = [];
             foreach ($pacientes as $paciente) {
-                if (isset($paciente['alertasMedicas'])) {
+                if (isset($paciente['alertasMedicas']) && is_array($paciente['alertasMedicas'])) {
                     foreach ($paciente['alertasMedicas'] as $alerta) {
                         if (in_array($alerta['severidad'] ?? '', ['critica', 'alta'])) {
                             $alertasCriticas++;
+                            $pacientesConAlertas[] = [
+                                'paciente' => $paciente['nombre'] . ' ' . $paciente['apellido'],
+                                'rut' => $paciente['rut'] ?? 'N/A',
+                                'descripcion' => $alerta['descripcion'] ?? 'Sin descripción',
+                                'severidad' => $alerta['severidad'] ?? 'media',
+                                'fecha' => isset($alerta['fecha']) ? Carbon::parse($alerta['fecha'])->format('d/m/Y') : 'N/A',
+                            ];
                         }
                     }
                 }
             }
 
-            // Estadísticas
+            // Estadísticas para el dashboard
             $stats = [
                 [
-                    'value' => (string)$totalPacientes,
+                    'value' => number_format($totalPacientes, 0, ',', '.'),
                     'title' => 'Pacientes Activos',
-                    'sub' => 'Total en el sistema',
-                    'icon' => 'bi-people',
-                    'color' => 'primary'
+                    'subtitle' => 'Total en el sistema',
+                    'icon' => 'users',
+                    'color' => 'blue',
+                    'trend' => null,
                 ],
                 [
-                    'value' => '0',
-                    'title' => 'Citas Hoy',
-                    'sub' => 'Pendientes',
-                    'icon' => 'bi-calendar-check',
-                    'color' => 'success'
+                    'value' => number_format($totalFichas, 0, ',', '.'),
+                    'title' => 'Fichas Médicas',
+                    'subtitle' => '+' . $fichasEsteMes . ' este mes',
+                    'icon' => 'file-text',
+                    'color' => 'green',
+                    'trend' => $fichasEsteMes > 0 ? 'up' : 'stable',
                 ],
                 [
-                    'value' => '0',
+                    'value' => number_format($atencionesHoy, 0, ',', '.'),
+                    'title' => 'Atenciones Hoy',
+                    'subtitle' => number_format($atencionesMes, 0, ',', '.') . ' este mes',
+                    'icon' => 'calendar-check',
+                    'color' => 'purple',
+                    'trend' => $atencionesHoy > 0 ? 'up' : 'stable',
+                ],
+                [
+                    'value' => number_format($hospitalizacionesActivas, 0, ',', '.'),
+                    'title' => 'Hospitalizaciones',
+                    'subtitle' => 'Pacientes internados',
+                    'icon' => 'bed',
+                    'color' => 'orange',
+                    'trend' => null,
+                ],
+                [
+                    'value' => number_format($examenesPendientes, 0, ',', '.'),
                     'title' => 'Exámenes Pendientes',
-                    'sub' => 'Por revisar',
-                    'icon' => 'bi-flask',
-                    'color' => 'warning'
+                    'subtitle' => 'Por revisar',
+                    'icon' => 'flask-conical',
+                    'color' => 'yellow',
+                    'trend' => $examenesPendientes > 0 ? 'attention' : 'stable',
                 ],
                 [
-                    'value' => (string)$alertasCriticas,
+                    'value' => number_format($alertasCriticas, 0, ',', '.'),
                     'title' => 'Alertas Críticas',
-                    'sub' => 'Requieren atención',
-                    'icon' => 'bi-exclamation-triangle',
-                    'color' => 'danger'
+                    'subtitle' => 'Requieren atención',
+                    'icon' => 'alert-triangle',
+                    'color' => 'red',
+                    'trend' => $alertasCriticas > 0 ? 'attention' : 'stable',
                 ],
             ];
 
-            // Recopilar alertas para el dashboard
-            $alertas = [];
-            foreach ($pacientes as $paciente) {
-                if (isset($paciente['alertasMedicas'])) {
-                    foreach ($paciente['alertasMedicas'] as $alerta) {
-                        $alertas[] = [
-                            'id' => uniqid(),
-                            'pacienteNombre' => $paciente['nombreCompleto'] ?? ($paciente['nombre'] . ' ' . $paciente['apellido']),
-                            'tipo' => $this->mapAlertType($alerta['tipo'] ?? 'otro'),
-                            'severidad' => $alerta['severidad'] ?? 'media',
-                            'descripcion' => $alerta['descripcion'] ?? '',
-                            'fecha' => isset($alerta['fechaRegistro']) ? $alerta['fechaRegistro']->toIso8601String() : now()->toIso8601String(),
-                        ];
-                    }
-                }
-            }
-
-            // Ordenar por severidad y fecha
-            usort($alertas, function($a, $b) {
-                $severityOrder = ['critica' => 0, 'alta' => 1, 'media' => 2, 'baja' => 3];
-                $severityCompare = ($severityOrder[$a['severidad']] ?? 4) - ($severityOrder[$b['severidad']] ?? 4);
-                
-                if ($severityCompare !== 0) {
-                    return $severityCompare;
-                }
-                
-                return strtotime($b['fecha']) - strtotime($a['fecha']);
+            // Actividad reciente (últimas 10 consultas)
+            $actividadReciente = [];
+            $consultasOrdenadas = $consultas;
+            usort($consultasOrdenadas, function($a, $b) {
+                $fechaA = isset($a['fecha']) ? Carbon::parse($a['fecha']) : Carbon::now();
+                $fechaB = isset($b['fecha']) ? Carbon::parse($b['fecha']) : Carbon::now();
+                return $fechaB->timestamp - $fechaA->timestamp;
             });
 
-            // Limitar a las primeras 10 alertas
-            $alertas = array_slice($alertas, 0, 10);
+            foreach (array_slice($consultasOrdenadas, 0, 10) as $consulta) {
+                // Buscar el paciente
+                $paciente = null;
+                if (isset($consulta['pacienteId'])) {
+                    try {
+                        $paciente = $pacienteModel->find($consulta['pacienteId']);
+                    } catch (\Exception $e) {
+                        // Paciente no encontrado
+                    }
+                }
+
+                $actividadReciente[] = [
+                    'id' => $consulta['id'] ?? uniqid(),
+                    'paciente' => $paciente ? ($paciente['nombre'] . ' ' . $paciente['apellido']) : 'Paciente desconocido',
+                    'tipo' => 'Consulta Médica',
+                    'motivo' => $consulta['motivoConsulta'] ?? 'Sin motivo especificado',
+                    'fecha' => isset($consulta['fecha']) ? Carbon::parse($consulta['fecha'])->format('d/m/Y H:i') : 'N/A',
+                    'fechaRelativa' => isset($consulta['fecha']) ? Carbon::parse($consulta['fecha'])->diffForHumans() : 'N/A',
+                ];
+            }
 
             return Inertia::render('Dashboard', [
                 'stats' => $stats,
-                'alertas' => $alertas,
+                'alertas' => array_slice($pacientesConAlertas, 0, 10),
+                'actividadReciente' => $actividadReciente,
                 'isLoading' => false,
+                'resumen' => [
+                    'totalPacientes' => $totalPacientes,
+                    'totalFichas' => $totalFichas,
+                    'atencionesMes' => $atencionesMes,
+                    'hospitalizacionesActivas' => $hospitalizacionesActivas,
+                ],
             ]);
 
         } catch (\Exception $e) {
-            // Si hay error con Firebase, mostrar datos de ejemplo
+            // En caso de error, mostrar dashboard con datos vacíos
             return $this->fallbackDashboard($e->getMessage());
         }
     }
 
-    /**
-     * Mapear tipo de alerta de Firebase a tipo de dashboard
-     */
-    private function mapAlertType(string $tipo): string
-    {
-        $mapping = [
-            'alergia' => 'medicamento',
-            'enfermedad_cronica' => 'cita',
-            'medicamento_critico' => 'medicamento',
-            'otro' => 'examen',
-        ];
-
-        return $mapping[$tipo] ?? 'examen';
-    }
 
     /**
      * Dashboard de respaldo si Firebase falla
@@ -135,39 +220,59 @@ class DashboardController extends Controller
             [
                 'value' => '0',
                 'title' => 'Pacientes Activos',
-                'sub' => 'Firebase no disponible',
-                'icon' => 'bi-people',
-                'color' => 'primary'
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'users',
+                'color' => 'blue',
+                'trend' => null,
             ],
             [
                 'value' => '0',
-                'title' => 'Citas Hoy',
-                'sub' => 'Firebase no disponible',
-                'icon' => 'bi-calendar-check',
-                'color' => 'success'
+                'title' => 'Fichas Médicas',
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'file-text',
+                'color' => 'green',
+                'trend' => null,
+            ],
+            [
+                'value' => '0',
+                'title' => 'Atenciones Hoy',
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'calendar-check',
+                'color' => 'purple',
+                'trend' => null,
+            ],
+            [
+                'value' => '0',
+                'title' => 'Hospitalizaciones',
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'bed',
+                'color' => 'orange',
+                'trend' => null,
             ],
             [
                 'value' => '0',
                 'title' => 'Exámenes Pendientes',
-                'sub' => 'Firebase no disponible',
-                'icon' => 'bi-flask',
-                'color' => 'warning'
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'flask-conical',
+                'color' => 'yellow',
+                'trend' => null,
             ],
             [
                 'value' => '0',
                 'title' => 'Alertas Críticas',
-                'sub' => 'Firebase no disponible',
-                'icon' => 'bi-exclamation-triangle',
-                'color' => 'danger'
+                'subtitle' => 'Firebase no disponible',
+                'icon' => 'alert-triangle',
+                'color' => 'red',
+                'trend' => null,
             ],
         ];
 
         return Inertia::render('Dashboard', [
             'stats' => $stats,
             'alertas' => [],
+            'actividadReciente' => [],
             'isLoading' => false,
             'error' => 'Error de conexión con Firebase: ' . $error,
         ]);
     }
 }
-

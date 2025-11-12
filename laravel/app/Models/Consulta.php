@@ -16,6 +16,28 @@ class Consulta
     }
 
     /**
+     * Obtener todas las consultas
+     */
+    public function all(): array
+    {
+        $documents = $this->firestore
+            ->database()
+            ->collection($this->collection)
+            ->documents();
+
+        $consultas = [];
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                $consultas[] = $this->formatDates($data);
+            }
+        }
+
+        return $consultas;
+    }
+
+    /**
      * Obtener todas las consultas de un paciente
      */
     public function findByPaciente(string $idPaciente): array

@@ -15,6 +15,16 @@ Route::get('dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Ruta de debug para ver datos del dashboard
+Route::get('/debug-dashboard', function () {
+    putenv('GRPC_DEFAULT_SSL_ROOTS_FILE_PATH=C:/grpc/roots.pem');
+    
+    $controller = new DashboardController();
+    $response = $controller->index();
+    
+    return response()->json($response->toResponse(request())->getData());
+})->middleware(['auth', 'verified']);
+
 // Ruta de prueba simple para verificar Firebase
 Route::get('/test-firebase-simple', function () {
     try {
