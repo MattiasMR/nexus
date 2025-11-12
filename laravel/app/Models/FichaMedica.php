@@ -16,6 +16,28 @@ class FichaMedica
     }
 
     /**
+     * Obtener todas las fichas médicas
+     */
+    public function all(): array
+    {
+        $documents = $this->firestore
+            ->database()
+            ->collection($this->collection)
+            ->documents();
+
+        $fichas = [];
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                $fichas[] = $this->formatDates($data);
+            }
+        }
+
+        return $fichas;
+    }
+
+    /**
      * Obtener ficha médica por paciente
      */
     public function findByPaciente(string $idPaciente): ?array

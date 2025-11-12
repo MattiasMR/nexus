@@ -8,9 +8,17 @@ import {
     PinInputSlot,
 } from '@/components/ui/pin-input';
 import AuthLayout from '@/layouts/AuthLayout.vue';
-import { store } from '@/routes/two-factor/login';
-import { Form, Head } from '@inertiajs/vue3';
+// import { store } from '@/routes/two-factor/login';
+import { router, Form, Head } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
+
+// Temporary store replacement
+const store = {
+    form: () => ({
+        action: '/two-factor-challenge',
+        method: 'post' as const,
+    }),
+};
 
 interface AuthConfigContent {
     title: string;
