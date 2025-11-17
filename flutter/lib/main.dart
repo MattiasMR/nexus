@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'utils/app_colors.dart';
-import 'services/auth_service.dart';
-import 'features/auth/pages/login_page.dart';
+import 'providers/auth_provider.dart';
+import 'features/auth/login_page.dart';
+import 'features/auth/hospital_selector_page.dart';
 import 'features/pacientes/patient_list_page.dart';
 import 'features/fichas_medicas/pages/fichas_medicas_list_page.dart';
 import 'features/estadisticas/estadisticas_page.dart';
@@ -20,18 +23,98 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Nexus',
-      debugShowCheckedModeBanner: false, // Elimina el banner DEBUG
-      theme: _buildTheme(),
-      initialRoute: '/login',
-      routes: {
-        '/login': (_) => const LoginPage(),
-        '/home': (_) => const HomeScreen(),
-        PatientListPage.routeName: (_) => const PatientListPage(),
-        FichasMedicasListPage.routeName: (_) => const FichasMedicasListPage(),
-        EstadisticasPage.routeName: (_) => const EstadisticasPage(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider()..initialize(),
+        ),
+      ],
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, _) {
+          return MaterialApp.router(
+            title: 'Nexus Medical',
+            debugShowCheckedModeBanner: false,
+            theme: _buildTheme(),
+            routerConfig: _createRouter(authProvider),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Configurar router con rutas protegidas
+  GoRouter _createRouter(AuthProvider authProvider) {
+    return GoRouter(
+      initialLocation: '/login',
+      refreshListenable: authProvider,
+      redirect: (context, state) {
+        final isAuthenticated = authProvider.isAuthenticated;
+        final isLoading = authProvider.isLoading;
+        final needsHospital = authProvider.needsHospitalSelection;
+        
+        final isLoginRoute = state.matchedLocation == '/login';
+        final isHospitalSelectorRoute = state.matchedLocation == '/select-hospital';
+        
+        // Mientras carga, no redirigir
+        if (isLoading) {
+          return null;
+        }
+        
+        // Si no está autenticado y no está en login, ir a login
+        if (!isAuthenticated && !isLoginRoute) {
+          return '/login';
+        }
+        
+        // Si está autenticado pero necesita seleccionar hospital
+        if (isAuthenticated && needsHospital && !isHospitalSelectorRoute) {
+          return '/select-hospital';
+        }
+        
+        // Si está autenticado, tiene hospital y está en login, ir a home
+        if (isAuthenticated && !needsHospital && isLoginRoute) {
+          return '/';
+        }
+        
+        // Si está autenticado, tiene hospital y está en selector, ir a home
+        if (isAuthenticated && !needsHospital && isHospitalSelectorRoute) {
+          return '/';
+        }
+        
+        return null;
       },
+      routes: [
+        // Ruta de login
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginPage(),
+        ),
+        
+        // Ruta de selección de hospital
+        GoRoute(
+          path: '/select-hospital',
+          builder: (context, state) => const HospitalSelectorPage(),
+        ),
+        
+        // Ruta principal (home)
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomeScreen(),
+        ),
+        
+        // Rutas de funcionalidades
+        GoRoute(
+          path: '/pacientes',
+          builder: (context, state) => const PatientListPage(),
+        ),
+        GoRoute(
+          path: '/fichas-medicas',
+          builder: (context, state) => const FichasMedicasListPage(),
+        ),
+        GoRoute(
+          path: '/estadisticas',
+          builder: (context, state) => const EstadisticasPage(),
+        ),
+      ],
     );
   }
 
@@ -70,106 +153,120 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final authService = AuthService();
-    final usuario = authService.usuarioActual;
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        final usuario = authProvider.currentUser;
+        final hospital = authProvider.activeHospital;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Nexus', style: TextStyle(fontSize: 20)),
-            if (usuario != null)
-              Text(
-                '${usuario.nombreCompleto} - ${usuario.rolTexto}',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w300),
-              ),
-          ],
-        ),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.only(right: 8.0),
-            child: Center(child: WeatherWidget()),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar Sesión',
-            onPressed: () {
-              authService.logout();
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+        return Scaffold(
+          appBar: AppBar(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.local_hospital,
-                  size: 96,
-                  color: colorScheme.primary,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Nexus',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 48),
-                
-                // Botón principal - Pacientes
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushNamed(PatientListPage.routeName);
-                  },
-                  icon: const Icon(Icons.people),
-                  label: const Text('Ver pacientes'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Fichas médicas
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushNamed(FichasMedicasListPage.routeName);
-                  },
-                  icon: const Icon(Icons.note_alt),
-                  label: const Text('Ver fichas médicas'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Estadísticas (solo médicos y admin)
-                if (usuario != null && usuario.puedeVerEstadisticas)
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pushNamed(EstadisticasPage.routeName);
-                    },
-                    icon: const Icon(Icons.analytics),
-                    label: const Text('Estadísticas y Dashboard'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                const Text('Nexus', style: TextStyle(fontSize: 20)),
+                if (usuario != null && hospital != null)
+                  Text(
+                    '${usuario.displayName} - ${hospital.nombre}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
               ],
             ),
+            actions: [
+              // Cambiar hospital (si tiene múltiples)
+              if (authProvider.userHospitals.length > 1)
+                IconButton(
+                  icon: const Icon(Icons.swap_horiz),
+                  tooltip: 'Cambiar Hospital',
+                  onPressed: () {
+                    context.push('/select-hospital');
+                  },
+                ),
+              const Padding(
+                padding: EdgeInsets.only(right: 8.0),
+                child: Center(child: WeatherWidget()),
+              ),
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Cerrar Sesión',
+                onPressed: () async {
+                  await authProvider.signOut();
+                },
+              ),
+            ],
           ),
-        ),
-      ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(
+                      Icons.local_hospital,
+                      size: 96,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Nexus',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 48),
+                    
+                    // Botón principal - Pacientes
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        context.push('/pacientes');
+                      },
+                      icon: const Icon(Icons.people),
+                      label: const Text('Ver pacientes'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Fichas médicas
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        context.push('/fichas-medicas');
+                      },
+                      icon: const Icon(Icons.note_alt),
+                      label: const Text('Ver fichas médicas'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    // Estadísticas (solo médicos y admin)
+                    if (usuario != null && usuario.puedeVerEstadisticas)
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          context.push('/estadisticas');
+                        },
+                        icon: const Icon(Icons.analytics),
+                        label: const Text('Estadísticas y Dashboard'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
