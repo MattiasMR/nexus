@@ -1336,46 +1336,85 @@ ion-badge {
 }
 
 // Estilos para subida de archivos
+.file-upload-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 .file-upload-container {
   position: relative;
-  margin-top: 8px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .file-input {
   display: none;
 }
 
-.file-upload-btn {
+.file-upload-btn,
+.camera-btn {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 10px;
   padding: 14px 20px;
   background: linear-gradient(135deg, #f8f9fa, #e9ecef);
   border: 2px dashed #cbd5e0;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+  width: 100%;
+  font-size: 15px;
   
   ion-icon {
-    font-size: 24px;
+    font-size: 22px;
     color: var(--c-primary-500);
   }
   
   span {
     color: #555;
     font-weight: 500;
-    flex: 1;
   }
   
   &:hover {
     background: linear-gradient(135deg, #e9ecef, #dee2e6);
     border-color: var(--c-primary-400);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     
     ion-icon {
       color: var(--c-primary-600);
     }
   }
+}
+
+.camera-btn {
+  flex: 1;
+  min-width: 200px;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-color: #90caf9;
+  
+  ion-icon {
+    color: #1976d2;
+  }
+  
+  &:hover {
+    background: linear-gradient(135deg, #bbdefb, #90caf9);
+    border-color: #1976d2;
+    
+    ion-icon {
+      color: #0d47a1;
+    }
+  }
+}
+
+.file-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #777;
+  font-style: italic;
 }
 
 .file-preview {

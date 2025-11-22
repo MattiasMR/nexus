@@ -205,6 +205,18 @@
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         }
         
+        .historial-header-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 12px;
+          gap: 12px;
+        }
+        
+        .historial-info {
+          flex: 1;
+        }
+        
         .historial-fecha {
           font-size: 0.85rem;
           color: #7f8c8d;
@@ -221,7 +233,37 @@
           font-size: 0.9rem;
           color: #2c3e50;
           font-weight: 600;
-          margin-bottom: 12px;
+        }
+        
+        .restore-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          background: linear-gradient(135deg, #3498db, #2980b9);
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 6px rgba(52, 152, 219, 0.3);
+          flex-shrink: 0;
+          
+          ion-icon {
+            font-size: 18px;
+          }
+          
+          &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+            background: linear-gradient(135deg, #2980b9, #1f6391);
+          }
+          
+          &:active {
+            transform: translateY(0);
+          }
         }
         
         .historial-texto {

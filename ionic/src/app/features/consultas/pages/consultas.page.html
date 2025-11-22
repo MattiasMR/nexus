@@ -501,19 +501,30 @@
         <!-- Campo de Archivo -->
         <div class="form-group">
           <label for="archivoExamen">Archivo del Examen *</label>
-          <div class="file-upload-container">
-            <input 
-              type="file" 
-              id="archivoExamen" 
-              (change)="onArchivoSeleccionado($event)"
-              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-              class="file-input"
-              #fileInput>
-            <label for="archivoExamen" class="file-upload-btn">
-              <ion-icon name="cloud-upload-outline"></ion-icon>
-              <span>{{ nuevoExamen.archivoNombre || 'Seleccionar archivo (PDF, JPG, PNG, DOC)' }}</span>
-            </label>
+          <div class="file-upload-options">
+            <!-- Botón subir archivo -->
+            <div class="file-upload-container">
+              <input 
+                type="file" 
+                id="archivoExamen" 
+                (change)="onArchivoSeleccionado($event)"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                class="file-input"
+                #fileInput>
+              <label for="archivoExamen" class="file-upload-btn">
+                <ion-icon name="cloud-upload-outline"></ion-icon>
+                <span>Subir archivo</span>
+              </label>
+            </div>
+            
+            <!-- Botón tomar foto -->
+            <button type="button" class="camera-btn" (click)="tomarFoto()">
+              <ion-icon name="camera-outline"></ion-icon>
+              <span>Tomar foto</span>
+            </button>
           </div>
+          
+          <p class="file-hint">Formatos: PDF, JPG, PNG, DOC • Máx: 10MB</p>
           
           <!-- Previsualización del archivo -->
           <div *ngIf="nuevoExamen.archivo" class="file-preview">
@@ -609,11 +620,19 @@
               </div>
               <div *ngIf="mostrarHistorial" class="historial-list">
                 <div *ngFor="let version of archivoViendose.historialVersiones.slice().reverse(); let i = index" class="historial-item">
-                  <div class="historial-fecha">
-                    {{ version.fecha?.toDate ? (version.fecha.toDate() | date:'dd/MM/yyyy HH:mm') : (version.fecha | date:'dd/MM/yyyy HH:mm') }}
-                    <span class="historial-usuario"> - {{ version.usuario }}</span>
+                  <div class="historial-header-item">
+                    <div class="historial-info">
+                      <div class="historial-fecha">
+                        {{ version.fecha?.toDate ? (version.fecha.toDate() | date:'dd/MM/yyyy HH:mm') : (version.fecha | date:'dd/MM/yyyy HH:mm') }}
+                        <span class="historial-usuario"> - {{ version.usuario }}</span>
+                      </div>
+                      <div class="historial-descripcion">{{ version.descripcion }}</div>
+                    </div>
+                    <button class="restore-btn" (click)="restaurarVersion(version)" title="Restaurar esta versión">
+                      <ion-icon name="reload-outline"></ion-icon>
+                      Restaurar
+                    </button>
                   </div>
-                  <div class="historial-descripcion">{{ version.descripcion }}</div>
                   <div class="historial-texto">
                     <pre>{{ version.texto || '(texto vacío)' }}</pre>
                   </div>

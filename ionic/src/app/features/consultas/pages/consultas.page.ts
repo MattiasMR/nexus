@@ -13,6 +13,7 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, firstValueFrom } from 'rxjs';
 import { Timestamp, doc, updateDoc, deleteDoc, Firestore } from '@angular/fire/firestore';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 // Servicios Firestore
 import { PacientesService } from '../../pacientes/data/pacientes.service';
@@ -874,6 +875,166 @@ export class ConsultasPage implements OnInit, OnDestroy {
       fileInput.value = '';
     }
   }
+
+  /**
+   * Tomar foto con la cámara del dispositivo usando HTML5 MediaDevices
+   */
+  async tomarFoto() {
+    try {
+      console.log('📸 Abriendo cámara...');
+      
+      // Verificar si el navegador soporta getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        this.showToast('Tu navegador no soporta acceso a la cámara', 'danger');
+        return;
+      }
+      
+      // Crear elemento de video temporal para capturar
+      const video = document.createElement('video');
+      video.setAttribute('autoplay', '');
+      video.setAttribute('playsinline', '');
+      
+      // Crear modal para mostrar la cámara
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      `;
+      
+      video.style.cssText = `
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      `;
+      
+      const btnContainer = document.createElement('div');
+      btnContainer.style.cssText = `
+        display: flex;
+        gap: 15px;
+      `;
+      
+      const btnCapture = document.createElement('button');
+      btnCapture.innerHTML = '📸 Capturar';
+      btnCapture.style.cssText = `
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      `;
+      
+      const btnCancel = document.createElement('button');
+      btnCancel.innerHTML = '❌ Cancelar';
+      btnCancel.style.cssText = `
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #f44336, #d32f2f);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      `;
+      
+      btnContainer.appendChild(btnCapture);
+      btnContainer.appendChild(btnCancel);
+      modal.appendChild(video);
+      modal.appendChild(btnContainer);
+      document.body.appendChild(modal);
+      
+      // Solicitar acceso a la cámara
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' }, // Usar cámara trasera en móviles
+        audio: false 
+      });
+      
+      video.srcObject = stream;
+      
+      // Función para capturar la foto
+      const capturarFoto = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0);
+        
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            // Detener el stream
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(modal);
+            
+            // Crear archivo
+            const fileName = `foto_examen_${Date.now()}.jpg`;
+            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            
+            console.log('📄 Archivo creado:', fileName, 'Tamaño:', file.size);
+            
+            // Validar tamaño
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+              console.log('❌ Foto demasiado grande');
+              this.showToast('La foto es demasiado grande. Máximo 10MB', 'warning');
+              return;
+            }
+            
+            // Advertencia si es mayor a 1MB
+            if (file.size > 1 * 1024 * 1024) {
+              console.warn('⚠️ Foto mayor a 1MB');
+              const toast = await this.toastCtrl.create({
+                message: 'Advertencia: Foto grande (>1MB). Se recomienda reducir calidad.',
+                duration: 4000,
+                color: 'warning'
+              });
+              await toast.present();
+            }
+            
+            // Crear URL de previsualización
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.nuevoExamen.archivoUrl = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+            
+            // Guardar archivo
+            this.nuevoExamen.archivo = file;
+            this.nuevoExamen.archivoNombre = fileName;
+            
+            console.log('✅ Foto guardada en nuevoExamen.archivo');
+            this.showToast('Foto capturada correctamente', 'success');
+          }
+        }, 'image/jpeg', 0.9);
+      };
+      
+      // Evento de captura
+      btnCapture.onclick = capturarFoto;
+      
+      // Evento de cancelar
+      btnCancel.onclick = () => {
+        stream.getTracks().forEach(track => track.stop());
+        document.body.removeChild(modal);
+        console.log('📸 Captura cancelada');
+      };
+      
+    } catch (error) {
+      console.error('❌ Error al abrir cámara:', error);
+      this.showToast('Error al acceder a la cámara. Verifique los permisos.', 'danger');
+    }
+  }
   
   /**
    * Guardar examen con archivo adjunto
@@ -1242,6 +1403,98 @@ export class ConsultasPage implements OnInit, OnDestroy {
     }
     
     return 'Versión editada';
+  }
+
+  /**
+   * Restaurar una versión anterior del texto
+   */
+  async restaurarVersion(version: any) {
+    const confirmar = confirm(
+      `¿Estás seguro de restaurar esta versión?\n\n` +
+      `Fecha: ${version.fecha?.toDate ? version.fecha.toDate().toLocaleString() : new Date(version.fecha).toLocaleString()}\n` +
+      `Descripción: ${version.descripcion}\n\n` +
+      `La versión actual se guardará en el historial.`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      this.isLoading = true;
+      console.log('🔄 Restaurando versión:', version);
+
+      // Obtener la orden actual
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId!));
+      const ordenActual = ordenes.find(o => o.id === this.archivoViendose.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      // Encontrar el examen y documento
+      const examen = ordenActual.examenes.find(e => e.idExamen === this.archivoViendose.examenId);
+      if (!examen || !examen.documentos) {
+        throw new Error('No se encontró el documento');
+      }
+
+      const docIndex = examen.documentos.findIndex(d => d.url === this.archivoViendose.url);
+      if (docIndex === -1) {
+        throw new Error('No se encontró el documento');
+      }
+
+      // Guardar la versión actual en el historial antes de restaurar
+      const textoActualAnterior = this.archivoViendose.textoActual || '';
+      const historialActualizado = [...(examen.documentos[docIndex].historialVersiones || [])];
+      
+      if (textoActualAnterior) {
+        const versionActualAnterior = {
+          fecha: Timestamp.now(),
+          usuario: 'system',
+          texto: textoActualAnterior,
+          descripcion: 'Versión antes de restaurar'
+        };
+        historialActualizado.push(versionActualAnterior);
+      }
+
+      // Restaurar la versión seleccionada como versión actual
+      examen.documentos[docIndex] = {
+        ...examen.documentos[docIndex],
+        textoActual: version.texto,
+        historialVersiones: historialActualizado
+      };
+
+      // Guardar en Firestore
+      await this.actualizarOrden(ordenActual);
+
+      // Actualizar vista local
+      this.archivoViendose = {
+        ...this.archivoViendose,
+        textoActual: version.texto,
+        historialVersiones: examen.documentos[docIndex].historialVersiones
+      };
+
+      // Recargar archivos
+      await this.cargarArchivosExamenes();
+
+      const toast = await this.toastCtrl.create({
+        message: 'Versión restaurada exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      console.log('✅ Versión restaurada correctamente');
+
+    } catch (error) {
+      console.error('❌ Error al restaurar versión:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al restaurar la versión: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
   }
 
   /**
