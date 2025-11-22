@@ -12,7 +12,7 @@ import {
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, firstValueFrom } from 'rxjs';
-import { Timestamp } from '@angular/fire/firestore';
+import { Timestamp, doc, updateDoc, deleteDoc, Firestore } from '@angular/fire/firestore';
 
 // Servicios Firestore
 import { PacientesService } from '../../pacientes/data/pacientes.service';
@@ -160,6 +160,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
+  private firestore = inject(Firestore);
   private pacientesService = inject(PacientesService);
   private fichasMedicasService = inject(FichasMedicasService);
   private consultasService = inject(ConsultasService);
@@ -926,9 +927,13 @@ export class ConsultasPage implements OnInit, OnDestroy {
         createdAt: Timestamp.now()
       };
 
-      console.log('Guardando orden de examen en Firestore:', ordenExamen);
-      await this.examenesService.createOrdenExamen(ordenExamen);
-      console.log('Orden de examen guardada exitosamente');
+      console.log('📦 Guardando orden de examen en Firestore...');
+      console.log('📋 Estructura completa:', JSON.stringify(ordenExamen, null, 2));
+      console.log('📄 URL del documento (primeros 100 chars):', ordenExamen.examenes[0].documentos![0].url.substring(0, 100) + '...');
+      
+      const ordenId = await this.examenesService.createOrdenExamen(ordenExamen);
+      console.log('✅ Orden de examen guardada exitosamente con ID:', ordenId);
+      console.log('🔍 Verifica en Firebase Console → Firestore → ordenes-examen/' + ordenId);
 
       const toast = await this.toastCtrl.create({
         message: 'Examen guardado exitosamente',
@@ -1018,35 +1023,168 @@ export class ConsultasPage implements OnInit, OnDestroy {
   }
 
   /**
+   * Ver datos de Firestore en consola (debugging)
+   */
+  async verDatosFirestore() {
+    if (!this.patientId) {
+      console.warn('⚠️ No hay paciente seleccionado');
+      return;
+    }
+
+    console.log('🔍 === DATOS DE FIRESTORE ===');
+    console.log('👤 Paciente ID:', this.patientId);
+    
+    try {
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId));
+      console.log('📦 Total de órdenes encontradas:', ordenes.length);
+      console.log('📋 Órdenes completas:', ordenes);
+      
+      ordenes.forEach((orden, index) => {
+        console.log(`\n📄 Orden ${index + 1}:`, {
+          id: orden.id,
+          paciente: orden.idPaciente,
+          fecha: orden.fecha,
+          estado: orden.estado,
+          totalExamenes: orden.examenes.length
+        });
+        
+        orden.examenes.forEach((examen, exIndex) => {
+          console.log(`  🧪 Examen ${exIndex + 1}: ${examen.nombreExamen}`);
+          console.log('     Documentos:', examen.documentos?.length || 0);
+          
+          if (examen.documentos && examen.documentos.length > 0) {
+            examen.documentos.forEach((doc, docIndex) => {
+              console.log(`     📎 Documento ${docIndex + 1}:`, {
+                nombre: doc.nombre,
+                tipo: doc.tipo,
+                tamaño: this.formatFileSize(doc.tamanio),
+                urlPreview: doc.url.substring(0, 50) + '...',
+                urlCompleta: doc.url
+              });
+            });
+          }
+        });
+      });
+      
+      console.log('\n🎯 Archivos procesados para UI:', this.archivosExamenes);
+      console.log('=== FIN DATOS FIRESTORE ===\n');
+      
+      const toast = await this.toastCtrl.create({
+        message: `${ordenes.length} órdenes encontradas. Ver consola (F12)`,
+        duration: 3000,
+        color: 'primary'
+      });
+      await toast.present();
+    } catch (error) {
+      console.error('❌ Error al obtener datos:', error);
+    }
+  }
+
+  /**
    * Eliminar archivo de examen
    */
   async eliminarArchivoExamen(archivo: any) {
-    const confirmacion = confirm(`¿Estás seguro de eliminar el archivo "${archivo.nombre}"?`);
+    const confirmacion = confirm(`¿Estás seguro de eliminar el archivo "${archivo.nombre}"?\n\nEsta acción no se puede deshacer.`);
     if (!confirmacion) return;
 
     try {
       this.isLoading = true;
-      
-      // TODO: Implementar eliminación del archivo de Storage y actualización de Firestore
-      // Por ahora solo mostramos un mensaje
+      console.log('🗑️ Eliminando archivo:', archivo);
+
+      // 1. Obtener la orden completa desde Firestore
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId!));
+      const ordenActual = ordenes.find(o => o.id === archivo.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      console.log('📦 Orden encontrada:', ordenActual);
+
+      // 2. Encontrar el examen que contiene el documento
+      const examenIndex = ordenActual.examenes.findIndex(e => e.idExamen === archivo.examenId);
+      if (examenIndex === -1) {
+        throw new Error('No se encontró el examen');
+      }
+
+      const examen = ordenActual.examenes[examenIndex];
+      console.log('🧪 Examen encontrado:', examen);
+
+      // 3. Filtrar el documento a eliminar
+      if (!examen.documentos || examen.documentos.length === 0) {
+        throw new Error('No hay documentos para eliminar');
+      }
+
+      const nuevosDocumentos = examen.documentos.filter(doc => doc.url !== archivo.url);
+      console.log('📄 Documentos después de filtrar:', nuevosDocumentos.length);
+
+      // 4. Actualizar el examen con los nuevos documentos
+      ordenActual.examenes[examenIndex] = {
+        ...examen,
+        documentos: nuevosDocumentos
+      };
+
+      // 5. Si no quedan documentos y solo hay este examen, eliminar toda la orden
+      if (nuevosDocumentos.length === 0 && ordenActual.examenes.length === 1) {
+        console.log('🗑️ Eliminando orden completa (no quedan documentos)');
+        await this.eliminarOrdenCompleta(ordenActual.id!);
+      } else if (nuevosDocumentos.length === 0) {
+        // Si no quedan documentos pero hay más exámenes, eliminar solo este examen
+        console.log('🗑️ Eliminando examen (no quedan documentos)');
+        ordenActual.examenes.splice(examenIndex, 1);
+        await this.actualizarOrden(ordenActual);
+      } else {
+        // Actualizar la orden con los documentos filtrados
+        console.log('💾 Actualizando orden con documentos filtrados');
+        await this.actualizarOrden(ordenActual);
+      }
+
+      // 6. Recargar la lista de archivos
+      await this.cargarArchivosExamenes();
+
       const toast = await this.toastCtrl.create({
-        message: 'Funcionalidad de eliminación en desarrollo',
+        message: 'Archivo eliminado exitosamente',
         duration: 2000,
-        color: 'warning'
+        color: 'success'
       });
       await toast.present();
       
     } catch (error) {
-      console.error('Error al eliminar archivo:', error);
+      console.error('❌ Error al eliminar archivo:', error);
       const toast = await this.toastCtrl.create({
-        message: 'Error al eliminar el archivo',
-        duration: 2000,
+        message: 'Error al eliminar el archivo: ' + (error as Error).message,
+        duration: 3000,
         color: 'danger'
       });
       await toast.present();
     } finally {
       this.isLoading = false;
     }
+  }
+
+  /**
+   * Actualizar una orden de examen en Firestore
+   */
+  private async actualizarOrden(orden: OrdenExamen): Promise<void> {
+    const docRef = doc(this.firestore, 'ordenes-examen', orden.id!);
+    
+    await updateDoc(docRef, {
+      examenes: orden.examenes,
+      updatedAt: Timestamp.now()
+    });
+    
+    console.log('✅ Orden actualizada en Firestore');
+  }
+
+  /**
+   * Eliminar una orden completa de examen
+   */
+  private async eliminarOrdenCompleta(ordenId: string): Promise<void> {
+    const docRef = doc(this.firestore, 'ordenes-examen', ordenId);
+    
+    await deleteDoc(docRef);
+    
+    console.log('✅ Orden eliminada completamente de Firestore');
   }
 
   /**

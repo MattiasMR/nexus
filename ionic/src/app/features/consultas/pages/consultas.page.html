@@ -118,6 +118,9 @@
           <ion-icon name="folder-open" class="section-icon"></ion-icon>
           <ion-card-title>Archivos de Exámenes</ion-card-title>
           <ion-badge color="primary">{{ archivosExamenes.length }}</ion-badge>
+          <button class="debug-btn" (click)="verDatosFirestore()" title="Ver datos en consola">
+            <ion-icon name="bug-outline"></ion-icon>
+          </button>
         </div>
       </ion-card-header>
       

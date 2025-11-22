@@ -333,6 +333,27 @@ ion-card.panel ion-card-content {
   font-weight: 600;
   text-transform: none;
 }
+.section-header .debug-btn {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  ion-icon {
+    font-size: 1.2rem;
+    color: #666;
+  }
+  
+  &:hover {
+    background: #e0e0e0;
+    border-color: #bbb;
+  }
+}
 
 /* EDIT MODE ACTIONS */
 .edit-actions {
