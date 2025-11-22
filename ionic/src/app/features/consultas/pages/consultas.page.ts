@@ -19,6 +19,7 @@ import { PacientesService } from '../../pacientes/data/pacientes.service';
 import { FichasMedicasService } from '../../fichas-medicas/data/fichas-medicas.service';
 import { ConsultasService } from '../data/consultas.service';
 import { ExamenesService } from '../../examenes/data/examenes.service';
+import { OcrService } from '../../../services/ocr.service';
 
 // Components
 import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/nueva-consulta-modal.component';
@@ -129,6 +130,11 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Archivos de exámenes subidos
   archivosExamenes: any[] = [];
   
+  // Estado de edición de texto OCR
+  editandoTexto = false;
+  textoEnEdicion = '';
+  mostrarHistorial = false;
+  
   // Popup de Nueva Consulta
   showConsultaPopup = false;
   formSubmitted = false;
@@ -165,6 +171,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   private fichasMedicasService = inject(FichasMedicasService);
   private consultasService = inject(ConsultasService);
   private examenesService = inject(ExamenesService);
+  private ocrService = inject(OcrService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
   private document = inject(DOCUMENT);
@@ -931,6 +938,43 @@ export class ConsultasPage implements OnInit, OnDestroy {
       const downloadURL = `data:${this.nuevoExamen.archivo.type};base64,${fileBase64}`;
       console.log('📄 URL de datos creada (Base64)');
 
+      // Procesar OCR si es una imagen
+      let textoExtraido = '';
+      let confianzaOCR = 0;
+      
+      if (this.nuevoExamen.archivo.type.startsWith('image/')) {
+        console.log('🔍 Detectada imagen, iniciando OCR...');
+        
+        const toastOCR = await this.toastCtrl.create({
+          message: 'Extrayendo texto de la imagen...',
+          duration: 0,
+          color: 'primary'
+        });
+        await toastOCR.present();
+        
+        try {
+          const ocrResult = await this.ocrService.extractTextFromImage(downloadURL);
+          textoExtraido = ocrResult.text;
+          confianzaOCR = ocrResult.confidence;
+          console.log('✅ OCR completado. Confianza:', confianzaOCR);
+          console.log('📝 Texto extraído:', textoExtraido);
+          
+          await toastOCR.dismiss();
+          
+          if (textoExtraido) {
+            const toastSuccess = await this.toastCtrl.create({
+              message: `Texto extraído exitosamente (${Math.round(confianzaOCR)}% confianza)`,
+              duration: 3000,
+              color: 'success'
+            });
+            await toastSuccess.present();
+          }
+        } catch (error) {
+          console.error('❌ Error en OCR:', error);
+          await toastOCR.dismiss();
+        }
+      }
+
       // 3. Crear el documento de examen en Firestore
       const ordenExamen: Omit<OrdenExamen, 'id'> = {
         idPaciente: this.patientId,
@@ -950,7 +994,10 @@ export class ConsultasPage implements OnInit, OnDestroy {
                 tipo: this.nuevoExamen.archivo.type,
                 tamanio: this.nuevoExamen.archivo.size,
                 fechaSubida: Timestamp.now(),
-                subidoPor: 'system' // Aquí deberías poner el ID del usuario actual
+                subidoPor: 'system', // Aquí deberías poner el ID del usuario actual
+                textoExtraido: textoExtraido || undefined,
+                confianzaOCR: confianzaOCR > 0 ? confianzaOCR : undefined,
+                historialEdiciones: []
               }
             ]
           }
@@ -1041,10 +1088,137 @@ export class ConsultasPage implements OnInit, OnDestroy {
     console.log('📂 Abriendo archivo:', archivo.nombre);
     console.log('📋 Tipo MIME:', archivo.tipo);
     this.archivoViendose = archivo;
+    this.editandoTexto = false;
+    this.mostrarHistorial = false;
   }
   
   cerrarVisorArchivo() {
     this.archivoViendose = null;
+    this.editandoTexto = false;
+    this.textoEnEdicion = '';
+    this.mostrarHistorial = false;
+  }
+
+  /**
+   * Iniciar edición de texto OCR
+   */
+  iniciarEdicionTexto() {
+    this.editandoTexto = true;
+    this.textoEnEdicion = this.archivoViendose.textoEditado || this.archivoViendose.textoExtraido || '';
+  }
+
+  /**
+   * Cancelar edición de texto
+   */
+  cancelarEdicionTexto() {
+    this.editandoTexto = false;
+    this.textoEnEdicion = '';
+  }
+
+  /**
+   * Guardar texto editado con historial
+   */
+  async guardarTextoEditado() {
+    if (!this.archivoViendose || !this.patientId) return;
+
+    try {
+      this.isLoading = true;
+      console.log('💾 Guardando texto editado...');
+
+      // Obtener la orden actual
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId));
+      const ordenActual = ordenes.find(o => o.id === this.archivoViendose.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      // Encontrar el examen y documento
+      const examen = ordenActual.examenes.find(e => e.idExamen === this.archivoViendose.examenId);
+      if (!examen || !examen.documentos) {
+        throw new Error('No se encontró el documento');
+      }
+
+      const docIndex = examen.documentos.findIndex(d => d.url === this.archivoViendose.url);
+      if (docIndex === -1) {
+        throw new Error('No se encontró el documento');
+      }
+
+      // Crear entrada en el historial
+      const textoAnterior = this.archivoViendose.textoEditado || this.archivoViendose.textoExtraido || '';
+      const edicion = {
+        fecha: Timestamp.now(),
+        usuario: 'system', // Aquí deberías poner el ID del usuario actual
+        textoAnterior: textoAnterior,
+        textoNuevo: this.textoEnEdicion,
+        cambios: this.generarDescripcionCambios(textoAnterior, this.textoEnEdicion)
+      };
+
+      // Actualizar documento
+      examen.documentos[docIndex] = {
+        ...examen.documentos[docIndex],
+        textoEditado: this.textoEnEdicion,
+        historialEdiciones: [
+          ...(examen.documentos[docIndex].historialEdiciones || []),
+          edicion
+        ]
+      };
+
+      // Guardar en Firestore
+      await this.actualizarOrden(ordenActual);
+
+      // Actualizar vista local
+      this.archivoViendose = {
+        ...this.archivoViendose,
+        textoEditado: this.textoEnEdicion,
+        historialEdiciones: examen.documentos[docIndex].historialEdiciones
+      };
+
+      // Recargar archivos
+      await this.cargarArchivosExamenes();
+
+      const toast = await this.toastCtrl.create({
+        message: 'Texto guardado exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      this.editandoTexto = false;
+      this.textoEnEdicion = '';
+
+    } catch (error) {
+      console.error('❌ Error al guardar texto:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al guardar el texto: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Generar descripción de cambios entre dos textos
+   */
+  private generarDescripcionCambios(textoAnterior: string, textoNuevo: string): string {
+    if (!textoAnterior) {
+      return 'Texto inicial agregado';
+    }
+    
+    const longitudAnterior = textoAnterior.length;
+    const longitudNueva = textoNuevo.length;
+    const diferencia = longitudNueva - longitudAnterior;
+    
+    if (diferencia > 0) {
+      return `Se agregaron ${diferencia} caracteres`;
+    } else if (diferencia < 0) {
+      return `Se eliminaron ${Math.abs(diferencia)} caracteres`;
+    } else {
+      return 'Texto modificado (misma longitud)';
+    }
   }
 
   /**

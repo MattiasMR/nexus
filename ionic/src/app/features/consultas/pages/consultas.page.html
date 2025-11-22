@@ -556,7 +556,67 @@
       <div class="archivo-viewer-body">
         <!-- Visor para imágenes -->
         <div *ngIf="archivoViendose.tipo.startsWith('image/')" class="image-viewer">
-          <img [src]="archivoViendose.url" [alt]="archivoViendose.nombre">
+          <div class="image-container">
+            <img [src]="archivoViendose.url" [alt]="archivoViendose.nombre">
+          </div>
+          
+          <!-- Texto extraído por OCR (editable) -->
+          <div *ngIf="archivoViendose.textoExtraido || archivoViendose.textoEditado" class="ocr-text-section">
+            <div class="ocr-header">
+              <div class="ocr-title">
+                <ion-icon name="document-text-outline"></ion-icon>
+                <h4>Texto Extraído</h4>
+                <span *ngIf="archivoViendose.confianzaOCR" class="confidence-badge">
+                  {{ archivoViendose.confianzaOCR | number:'1.0-0' }}% confianza
+                </span>
+              </div>
+              <button *ngIf="!editandoTexto" class="edit-text-btn" (click)="iniciarEdicionTexto()">
+                <ion-icon name="create-outline"></ion-icon>
+                Editar
+              </button>
+            </div>
+            
+            <!-- Modo lectura -->
+            <div *ngIf="!editandoTexto" class="ocr-text-display">
+              <pre>{{ archivoViendose.textoEditado || archivoViendose.textoExtraido }}</pre>
+            </div>
+            
+            <!-- Modo edición -->
+            <div *ngIf="editandoTexto" class="ocr-text-edit">
+              <ion-textarea
+                [(ngModel)]="textoEnEdicion"
+                rows="10"
+                placeholder="Edita el texto extraído..."
+                class="ocr-textarea">
+              </ion-textarea>
+              <div class="edit-actions">
+                <button class="cancel-btn" (click)="cancelarEdicionTexto()">
+                  <ion-icon name="close-outline"></ion-icon>
+                  Cancelar
+                </button>
+                <button class="save-btn" (click)="guardarTextoEditado()">
+                  <ion-icon name="save-outline"></ion-icon>
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+            
+            <!-- Historial de ediciones -->
+            <div *ngIf="archivoViendose.historialEdiciones && archivoViendose.historialEdiciones.length > 0" class="historial-section">
+              <div class="historial-header" (click)="mostrarHistorial = !mostrarHistorial">
+                <ion-icon [name]="mostrarHistorial ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+                <span>Historial de ediciones ({{ archivoViendose.historialEdiciones.length }})</span>
+              </div>
+              <div *ngIf="mostrarHistorial" class="historial-list">
+                <div *ngFor="let edicion of archivoViendose.historialEdiciones; let i = index" class="historial-item">
+                  <div class="historial-fecha">
+                    {{ edicion.fecha?.toDate ? (edicion.fecha.toDate() | date:'dd/MM/yyyy HH:mm') : (edicion.fecha | date:'dd/MM/yyyy HH:mm') }}
+                  </div>
+                  <div class="historial-cambios">{{ edicion.cambios }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         
         <!-- Mensaje para PDFs y otros documentos -->

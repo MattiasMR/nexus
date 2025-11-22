@@ -30,4 +30,18 @@ export interface DocumentoExamen {
   tamanio: number;      // En bytes
   fechaSubida: Date | Timestamp;
   subidoPor: string;    // ID del profesional
+  
+  // OCR y edición de texto
+  textoExtraido?: string;           // Texto extraído por OCR
+  textoEditado?: string;            // Texto editado por el usuario
+  confianzaOCR?: number;            // Confianza del OCR (0-100)
+  historialEdiciones?: EdicionTexto[];  // Historial de cambios
+}
+
+export interface EdicionTexto {
+  fecha: Date | Timestamp;
+  usuario: string;        // ID del usuario que editó
+  textoAnterior: string;
+  textoNuevo: string;
+  cambios: string;        // Descripción de los cambios
 }
