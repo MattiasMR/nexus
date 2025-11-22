@@ -559,19 +559,16 @@
           <img [src]="archivoViendose.url" [alt]="archivoViendose.nombre">
         </div>
         
-        <!-- Visor para PDFs -->
-        <div *ngIf="archivoViendose.tipo === 'application/pdf'" class="pdf-viewer">
-          <iframe [src]="getSafeUrl(archivoViendose.url)" frameborder="0"></iframe>
-        </div>
-        
-        <!-- Mensaje para otros tipos -->
-        <div *ngIf="!archivoViendose.tipo.startsWith('image/') && archivoViendose.tipo !== 'application/pdf'" class="unsupported-viewer">
-          <ion-icon name="document-attach" style="font-size: 64px; color: #999;"></ion-icon>
-          <p>No se puede previsualizar este tipo de archivo</p>
-          <a [href]="archivoViendose.url" download="{{ archivoViendose.nombre }}" class="download-link">
-            <ion-icon name="download"></ion-icon>
+        <!-- Mensaje para PDFs y otros documentos -->
+        <div *ngIf="!archivoViendose.tipo.startsWith('image/')" class="unsupported-viewer">
+          <ion-icon name="document-text" style="font-size: 64px; color: var(--ion-color-primary);"></ion-icon>
+          <h4>{{ archivoViendose.nombre }}</h4>
+          <p class="file-type-info">{{ archivoViendose.tipo }}</p>
+          <p class="preview-message">Este tipo de documento no puede ser previsualizado</p>
+          <button class="download-btn-primary" (click)="descargarArchivo(archivoViendose)">
+            <ion-icon name="download-outline"></ion-icon>
             Descargar archivo
-          </a>
+          </button>
         </div>
       </div>
       

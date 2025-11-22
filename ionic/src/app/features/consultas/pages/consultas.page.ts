@@ -781,14 +781,14 @@ export class ConsultasPage implements OnInit, OnDestroy {
   /**
    * Manejar selección de archivo
    */
-  onArchivoSeleccionado(event: Event) {
+  async onArchivoSeleccionado(event: Event) {
     console.log('📁 onArchivoSeleccionado() llamado');
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       const file = input.files[0];
       console.log('📄 Archivo seleccionado:', file.name, 'Tamaño:', file.size, 'Tipo:', file.type);
       
-      // Validar tamaño (máximo 10MB)
+      // Validar tamaño (máximo 10MB pero advertir sobre limitación de Firestore con Base64)
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
         console.log('❌ Archivo demasiado grande');
@@ -796,14 +796,45 @@ export class ConsultasPage implements OnInit, OnDestroy {
         return;
       }
       
-      // Validar tipo de archivo
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!allowedTypes.includes(file.type)) {
-        console.log('❌ Tipo de archivo no permitido');
-        this.showToast('Formato de archivo no permitido. Use PDF, JPG, PNG o DOC', 'warning');
+      // Advertencia si el archivo es mayor a 1MB (límite de Firestore)
+      if (file.size > 1 * 1024 * 1024) {
+        console.warn('⚠️ Archivo mayor a 1MB. Podría tener problemas con Firestore (límite Base64)');
+        const toast = await this.toastCtrl.create({
+          message: 'Advertencia: Archivo grande (>1MB). Se recomienda usar archivos más pequeños.',
+          duration: 4000,
+          color: 'warning'
+        });
+        await toast.present();
+      }
+      
+      // Validar tipo de archivo - Aceptar más tipos MIME
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/msword', // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'text/plain', // .txt
+      ];
+      
+      // Validar también por extensión como fallback
+      const fileName = file.name.toLowerCase();
+      const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.txt'];
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!allowedTypes.includes(file.type) && !hasValidExtension) {
+        console.log('❌ Tipo de archivo no permitido:', file.type);
+        console.log('📝 Extensión del archivo:', fileName.substring(fileName.lastIndexOf('.')));
+        this.showToast('Formato de archivo no permitido. Use PDF, imágenes (JPG, PNG) o documentos (DOC, DOCX)', 'warning');
         return;
       }
       
+      console.log('✅ Archivo validado correctamente');
       this.nuevoExamen.archivo = file;
       this.nuevoExamen.archivoNombre = file.name;
       console.log('✅ Archivo guardado en nuevoExamen.archivo');
@@ -1008,18 +1039,59 @@ export class ConsultasPage implements OnInit, OnDestroy {
   
   abrirArchivo(archivo: any) {
     console.log('📂 Abriendo archivo:', archivo.nombre);
+    console.log('📋 Tipo MIME:', archivo.tipo);
     this.archivoViendose = archivo;
   }
   
   cerrarVisorArchivo() {
     this.archivoViendose = null;
   }
+
+  /**
+   * Descargar archivo desde base64
+   */
+  descargarArchivo(archivo: any) {
+    console.log('💾 Descargando archivo:', archivo.nombre);
+    
+    try {
+      // Crear un enlace temporal para descargar
+      const link = document.createElement('a');
+      link.href = archivo.url;
+      link.download = archivo.nombre;
+      link.style.display = 'none';
+      
+      // Agregar al DOM, hacer click y remover
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Descarga iniciada');
+      
+      // Mostrar toast de confirmación
+      this.toastCtrl.create({
+        message: 'Descarga iniciada',
+        duration: 2000,
+        color: 'success'
+      }).then(toast => toast.present());
+      
+    } catch (error) {
+      console.error('❌ Error al descargar archivo:', error);
+      this.toastCtrl.create({
+        message: 'Error al descargar el archivo',
+        duration: 2000,
+        color: 'danger'
+      }).then(toast => toast.present());
+    }
+  }
   
   /**
    * Obtener URL sanitizada para iframe
    */
   getSafeUrl(url: string): SafeResourceUrl {
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    console.log('🔒 Sanitizando URL para iframe (primeros 100 chars):', url.substring(0, 100));
+    const safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    console.log('✅ URL sanitizada');
+    return safeUrl;
   }
 
   /**
