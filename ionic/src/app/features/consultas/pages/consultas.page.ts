@@ -119,7 +119,10 @@ export class ConsultasPage implements OnInit, OnDestroy {
   nuevoExamen = {
     nombreExamen: '',
     tipoExamen: '',
-    resultado: ''
+    resultado: '',
+    archivo: null as File | null,
+    archivoNombre: '',
+    archivoUrl: ''
   };
   
   // Popup de Nueva Consulta
@@ -742,7 +745,10 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.nuevoExamen = {
       nombreExamen: '',
       tipoExamen: '',
-      resultado: ''
+      resultado: '',
+      archivo: null,
+      archivoNombre: '',
+      archivoUrl: ''
     };
   }
   
@@ -754,12 +760,66 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.nuevoExamen = {
       nombreExamen: '',
       tipoExamen: '',
-      resultado: ''
+      resultado: '',
+      archivo: null,
+      archivoNombre: '',
+      archivoUrl: ''
     };
   }
   
   /**
-   * Guardar examen (placeholder - requiere integración con ExamenesService)
+   * Manejar selección de archivo
+   */
+  onArchivoSeleccionado(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      
+      // Validar tamaño (máximo 10MB)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        this.showToast('El archivo es demasiado grande. Máximo 10MB', 'warning');
+        return;
+      }
+      
+      // Validar tipo de archivo
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!allowedTypes.includes(file.type)) {
+        this.showToast('Formato de archivo no permitido. Use PDF, JPG, PNG o DOC', 'warning');
+        return;
+      }
+      
+      this.nuevoExamen.archivo = file;
+      this.nuevoExamen.archivoNombre = file.name;
+      
+      // Crear URL de previsualización para imágenes
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.nuevoExamen.archivoUrl = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }
+  
+  /**
+   * Eliminar archivo seleccionado
+   */
+  eliminarArchivo() {
+    this.nuevoExamen.archivo = null;
+    this.nuevoExamen.archivoNombre = '';
+    this.nuevoExamen.archivoUrl = '';
+    
+    // Limpiar el input file
+    const fileInput = this.document.querySelector('#archivoExamen') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+  
+  /**
+   * Guardar examen (placeholder - requiere integración con ExamenesService y Storage)
    */
   async guardarExamen() {
     if (!this.nuevoExamen.nombreExamen.trim()) {
@@ -772,10 +832,33 @@ export class ConsultasPage implements OnInit, OnDestroy {
       return;
     }
     
-    // TODO: Implementar guardado en Firestore cuando esté configurado Storage
+    if (!this.nuevoExamen.archivo) {
+      const toast = await this.toastCtrl.create({
+        message: 'Debe seleccionar un archivo',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    // TODO: Implementar subida a Firebase Storage y guardado en Firestore
+    // 1. Subir archivo a Firebase Storage: storage/examenes/{pacienteId}/{timestamp}_{filename}
+    // 2. Obtener URL de descarga
+    // 3. Guardar metadata en Firestore collection 'ordenes-examen'
+    
+    console.log('Archivo a subir:', {
+      nombre: this.nuevoExamen.archivoNombre,
+      tipo: this.nuevoExamen.archivo.type,
+      tamaño: this.nuevoExamen.archivo.size,
+      examen: this.nuevoExamen.nombreExamen,
+      categoria: this.nuevoExamen.tipoExamen,
+      resultado: this.nuevoExamen.resultado
+    });
+    
     const toast = await this.toastCtrl.create({
-      message: 'Funcionalidad en desarrollo - Examen guardado localmente',
-      duration: 2000,
+      message: 'Funcionalidad en desarrollo - Archivo y datos capturados correctamente',
+      duration: 3000,
       color: 'success'
     });
     await toast.present();

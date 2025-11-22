@@ -448,6 +448,43 @@
             rows="4"
             class="form-input"></textarea>
         </div>
+        
+        <!-- Campo de Archivo -->
+        <div class="form-group">
+          <label for="archivoExamen">Archivo del Examen *</label>
+          <div class="file-upload-container">
+            <input 
+              type="file" 
+              id="archivoExamen" 
+              (change)="onArchivoSeleccionado($event)"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              class="file-input"
+              #fileInput>
+            <label for="archivoExamen" class="file-upload-btn">
+              <ion-icon name="cloud-upload-outline"></ion-icon>
+              <span>{{ nuevoExamen.archivoNombre || 'Seleccionar archivo (PDF, JPG, PNG, DOC)' }}</span>
+            </label>
+          </div>
+          
+          <!-- Previsualización del archivo -->
+          <div *ngIf="nuevoExamen.archivo" class="file-preview">
+            <div class="file-info">
+              <ion-icon [name]="nuevoExamen.archivo.type.startsWith('image/') ? 'image' : 'document'"></ion-icon>
+              <div class="file-details">
+                <span class="file-name">{{ nuevoExamen.archivoNombre }}</span>
+                <span class="file-size">{{ (nuevoExamen.archivo.size / 1024 / 1024).toFixed(2) }} MB</span>
+              </div>
+              <button type="button" class="remove-file-btn" (click)="eliminarArchivo()">
+                <ion-icon name="close-circle"></ion-icon>
+              </button>
+            </div>
+            
+            <!-- Previsualización de imagen -->
+            <div *ngIf="nuevoExamen.archivoUrl" class="image-preview">
+              <img [src]="nuevoExamen.archivoUrl" alt="Previsualización">
+            </div>
+          </div>
+        </div>
       </div>
       
       <div class="popup-actions">
