@@ -5,7 +5,7 @@ import {
   IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonBadge, IonGrid, IonRow, IonCol, IonList, IonItem, IonLabel,
   IonTextarea, IonTabs, IonTabButton, IonSpinner, IonToast,
-  IonInput, IonSelect, IonSelectOption, IonDatetime, IonDatetimeButton, IonModal,
+  IonInput, IonSelect, IonSelectOption,
   ModalController, ToastController
 } from '@ionic/angular/standalone';
 import { CommonModule, DOCUMENT } from '@angular/common';
@@ -21,7 +21,6 @@ import { ExamenesService } from '../../examenes/data/examenes.service';
 
 // Components
 import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/nueva-consulta-modal.component';
-import { SubirExamenModalComponent } from '../components/subir-examen-modal/subir-examen-modal.component';
 import { TimelineComponent, TimelineItem } from '../../../shared/components/timeline/timeline.component';
 
 // Modelos
@@ -95,7 +94,6 @@ interface OrdenExamenUI extends OrdenExamen {
     IonCard, IonCardContent, IonCardHeader, IonCardTitle,
     IonBadge, IonGrid, IonRow, IonCol,
     IonTextarea, IonInput, IonSelect, IonSelectOption,
-    IonDatetime, IonDatetimeButton, IonModal,
     CommonModule, FormsModule, TimelineComponent
   ],
 })
@@ -118,34 +116,6 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Edit mode
   isEditMode = false;
   editedData: any = {};
-  
-  // Popup: Nueva Consulta
-  showConsultaPopup = false;
-  datosNuevaConsulta = {
-    fechaConsulta: new Date().toISOString(),
-    motivoConsulta: '',
-    diagnostico: '',
-    tratamiento: '',
-    signosVitales: {
-      presionArterial: '',
-      frecuenciaCardiaca: '',
-      temperatura: '',
-      saturacionOxigeno: '',
-      peso: '',
-      talla: ''
-    },
-    observaciones: ''
-  };
-  maxDate = new Date().toISOString();
-  formSubmitted = false;
-  
-  // Popup: Subir Examen
-  showExamenPopup = false;
-  nuevoExamen = {
-    nombreExamen: '',
-    tipoExamen: '',
-    resultado: ''
-  };
   
   // Timeline items - cached property instead of getter
   timelineItems: TimelineItem[] = [];
@@ -420,76 +390,46 @@ export class ConsultasPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Open popup to create a new consultation
+   * Open modal to create a new consultation
+   * Guard prevents multiple simultaneous opens
    */
-  nuevaConsulta() {
+  async nuevaConsulta() {
+    // Prevent multiple modal opens
+    if (this.isModalOpen) {
+      console.log('Modal already open, ignoring request');
+      return;
+    }
+    
     if (!this.paciente || !this.fichaId) {
-      this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
+      await this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
       return;
     }
 
-    // Reset form data
-    this.datosNuevaConsulta = {
-      fechaConsulta: new Date().toISOString(),
-      motivoConsulta: '',
-      diagnostico: '',
-      tratamiento: '',
-      signosVitales: {
-        presionArterial: '',
-        frecuenciaCardiaca: '',
-        temperatura: '',
-        saturacionOxigeno: '',
-        peso: '',
-        talla: ''
-      },
-      observaciones: ''
-    };
-    this.formSubmitted = false;
+    this.isModalOpen = true;
 
-    // Show popup
-    this.showConsultaPopup = true;
-  }
+    try {
+      const presentingElement = this.document.querySelector('ion-router-outlet') as HTMLElement | null;
+      const modal = await this.modalCtrl.create({
+        component: NuevaConsultaModalComponent,
+        componentProps: {
+          pacienteId: this.paciente.id,
+          fichaMedicaId: this.fichaId,
+          pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
+        },
+        presentingElement: presentingElement ?? undefined
+      });
 
-  /**
-   * Close consultation popup
-   */
-  cerrarPopupConsulta() {
-    this.showConsultaPopup = false;
-    this.formSubmitted = false;
-  }
+      await modal.present();
 
-  /**
-   * Validate and save consultation
-   */
-  async confirmarNuevaConsulta() {
-    this.formSubmitted = true;
+      const { data, role } = await modal.onWillDismiss();
 
-    // Validate required fields
-    if (!this.datosNuevaConsulta.motivoConsulta.trim()) {
-      return;
+      if (role === 'confirm' && data) {
+        await this.guardarConsulta(data);
+      }
+    } finally {
+      // Always release the lock
+      this.isModalOpen = false;
     }
-
-    // Build consultation object
-    const consultaData = {
-      idPaciente: this.paciente!.id,
-      idFichaMedica: this.fichaId!,
-      idProfesional: 'TEMP_PROF_001',
-      fecha: Timestamp.fromDate(new Date(this.datosNuevaConsulta.fechaConsulta)),
-      motivo: this.datosNuevaConsulta.motivoConsulta.trim(),
-      tratamiento: this.datosNuevaConsulta.tratamiento.trim() || undefined,
-      observaciones: this.datosNuevaConsulta.observaciones.trim() || undefined,
-      notas: []
-    };
-
-    await this.guardarConsulta(consultaData);
-    this.cerrarPopupConsulta();
-  }
-
-  /**
-   * Check if consultation form is valid
-   */
-  isConsultaFormValid(): boolean {
-    return this.datosNuevaConsulta.motivoConsulta.trim().length > 0;
   }
 
   /**
@@ -542,52 +482,6 @@ export class ConsultasPage implements OnInit, OnDestroy {
       console.error('Error saving consultation:', error);
       await this.showToast('Error al guardar la consulta', 'danger');
     }
-  }
-
-  /**
-   * Open popup to upload exam result
-   */
-  subirExamen() {
-    if (!this.paciente || !this.fichaId) {
-      this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
-      return;
-    }
-
-    // Limpiar datos previos
-    this.nuevoExamen = {
-      nombreExamen: '',
-      tipoExamen: '',
-      resultado: ''
-    };
-
-    // Mostrar popup
-    this.showExamenPopup = true;
-  }
-
-  /**
-   * Close exam upload popup
-   */
-  cerrarPopupExamen() {
-    this.showExamenPopup = false;
-    this.nuevoExamen = {
-      nombreExamen: '',
-      tipoExamen: '',
-      resultado: ''
-    };
-  }
-
-  /**
-   * Save exam data (placeholder)
-   */
-  async guardarExamen() {
-    if (!this.nuevoExamen.nombreExamen) {
-      await this.showToast('Ingresa el nombre del examen', 'warning');
-      return;
-    }
-
-    console.log('Datos del examen:', this.nuevoExamen);
-    await this.showToast('Funcionalidad en desarrollo', 'warning');
-    this.cerrarPopupExamen();
   }
 
   /**
