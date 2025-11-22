@@ -19,12 +19,12 @@
         </div>
         
         <div class="header-actions">
-          <ion-button (click)="nuevaConsulta()" fill="solid" color="primary" class="nueva-consulta-btn">
+          <ion-button (click)="nuevaConsulta()" fill="outline" class="nueva-consulta-btn">
             <ion-icon name="add-circle" slot="start"></ion-icon>
             Nueva Consulta
           </ion-button>
           
-          <ion-button (click)="subirExamen()" fill="solid" color="secondary" class="subir-examen-btn">
+          <ion-button (click)="subirExamen()" fill="solid" class="subir-examen-btn">
             <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
             Subir Examen
           </ion-button>
@@ -235,6 +235,179 @@
       </ion-card-content>
     </ion-card>
 
+  </div>
+
+  <!-- POPUP OVERLAY: Nueva Consulta -->
+  <div *ngIf="showConsultaPopup" class="popup-overlay" (click)="cerrarPopupConsulta()">
+    <div class="popup-content popup-large" (click)="$event.stopPropagation()">
+      <button class="close-btn" (click)="cerrarPopupConsulta()">
+        <ion-icon name="close"></ion-icon>
+      </button>
+      
+      <div class="popup-body">
+        <h2>Nueva Consulta</h2>
+        <p class="patient-info">Paciente: {{ paciente?.nombre }} {{ paciente?.apellido }}</p>
+        
+        <!-- Fecha de Consulta -->
+        <div class="form-group">
+          <label>Fecha de Consulta *</label>
+          <ion-datetime-button datetime="datetime-consulta"></ion-datetime-button>
+          <ion-modal [keepContentsMounted]="true">
+            <ng-template>
+              <ion-datetime 
+                id="datetime-consulta"
+                [(ngModel)]="datosNuevaConsulta.fechaConsulta"
+                presentation="date-time"
+                [max]="maxDate"
+                locale="es-CL">
+              </ion-datetime>
+            </ng-template>
+          </ion-modal>
+        </div>
+
+        <!-- Motivo de Consulta -->
+        <div class="form-group">
+          <label>Motivo de Consulta *</label>
+          <ion-textarea
+            [(ngModel)]="datosNuevaConsulta.motivoConsulta"
+            placeholder="Ej: Dolor abdominal, control de presión, seguimiento..."
+            rows="3"
+            fill="outline"
+            [class.ion-invalid]="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()"
+          ></ion-textarea>
+          <div class="error-message" *ngIf="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()">
+            El motivo de consulta es obligatorio
+          </div>
+        </div>
+
+        <!-- Diagnóstico -->
+        <div class="form-group">
+          <label>Diagnóstico</label>
+          <ion-textarea
+            [(ngModel)]="datosNuevaConsulta.diagnostico"
+            placeholder="Ej: Hipertensión arterial esencial, Diabetes tipo 2..."
+            rows="2"
+            fill="outline"
+          ></ion-textarea>
+        </div>
+
+        <!-- Tratamiento -->
+        <div class="form-group">
+          <label>Tratamiento</label>
+          <ion-textarea
+            [(ngModel)]="datosNuevaConsulta.tratamiento"
+            placeholder="Ej: Enalapril 10mg cada 12hrs, control en 15 días..."
+            rows="3"
+            fill="outline"
+          ></ion-textarea>
+        </div>
+
+        <!-- Signos Vitales -->
+        <div class="section-divider">
+          <label>Signos Vitales</label>
+        </div>
+
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Presión Arterial (mmHg)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.presionArterial"
+                  type="text"
+                  placeholder="Ej: 120/80"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Frecuencia Cardíaca (lpm)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.frecuenciaCardiaca"
+                  type="number"
+                  placeholder="Ej: 72"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Temperatura (°C)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.temperatura"
+                  type="text"
+                  placeholder="Ej: 36.5"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Saturación O2 (%)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.saturacionOxigeno"
+                  type="number"
+                  placeholder="Ej: 98"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Peso (kg)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.peso"
+                  type="text"
+                  placeholder="Ej: 75.5"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label>Talla (cm)</label>
+                <ion-input
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.talla"
+                  type="text"
+                  placeholder="Ej: 170"
+                  fill="outline"
+                ></ion-input>
+              </div>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+
+        <!-- Observaciones -->
+        <div class="form-group">
+          <label>Observaciones</label>
+          <ion-textarea
+            [(ngModel)]="datosNuevaConsulta.observaciones"
+            placeholder="Notas adicionales..."
+            rows="2"
+            fill="outline"
+          ></ion-textarea>
+        </div>
+
+        <div class="popup-actions">
+          <button class="btn-secondary" (click)="cerrarPopupConsulta()">
+            Cancelar
+          </button>
+          <button 
+            class="btn-primary" 
+            (click)="confirmarNuevaConsulta()"
+            [disabled]="!isConsultaFormValid()"
+          >
+            Guardar Consulta
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- POPUP OVERLAY: Subir Examen -->
