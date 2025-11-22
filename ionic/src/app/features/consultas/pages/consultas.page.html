@@ -237,6 +237,174 @@
 
   </div>
 
+  <!-- Popup para Nueva Consulta -->
+  <div *ngIf="showConsultaPopup" class="popup-overlay" (click)="cerrarPopupConsulta()">
+    <div class="popup-content popup-large" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Nueva Consulta - {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</h2>
+        <button class="close-btn" (click)="cerrarPopupConsulta()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <!-- Fecha de Consulta -->
+        <div class="form-group">
+          <label for="fechaConsulta">Fecha de Consulta *</label>
+          <ion-datetime-button datetime="datetime-consulta"></ion-datetime-button>
+          <ion-modal [keepContentsMounted]="true">
+            <ng-template>
+              <ion-datetime 
+                id="datetime-consulta"
+                [(ngModel)]="datosNuevaConsulta.fechaConsulta"
+                presentation="date-time"
+                [max]="maxDate"
+                locale="es-CL">
+              </ion-datetime>
+            </ng-template>
+          </ion-modal>
+        </div>
+
+        <!-- Motivo de Consulta -->
+        <div class="form-group">
+          <label for="motivoConsulta">Motivo de Consulta *</label>
+          <textarea 
+            id="motivoConsulta" 
+            [(ngModel)]="datosNuevaConsulta.motivoConsulta"
+            placeholder="Ej: Dolor abdominal, control de presión, seguimiento..."
+            rows="3"
+            class="form-input"
+            [class.invalid]="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()"></textarea>
+          <div class="error-message" *ngIf="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()">
+            El motivo de consulta es obligatorio
+          </div>
+        </div>
+
+        <!-- Diagnóstico -->
+        <div class="form-group">
+          <label for="diagnostico">Diagnóstico</label>
+          <textarea 
+            id="diagnostico" 
+            [(ngModel)]="datosNuevaConsulta.diagnostico"
+            placeholder="Ej: Hipertensión arterial esencial, Diabetes tipo 2..."
+            rows="2"
+            class="form-input"></textarea>
+        </div>
+
+        <!-- Tratamiento -->
+        <div class="form-group">
+          <label for="tratamiento">Tratamiento</label>
+          <textarea 
+            id="tratamiento" 
+            [(ngModel)]="datosNuevaConsulta.tratamiento"
+            placeholder="Ej: Enalapril 10mg cada 12hrs, control en 15 días..."
+            rows="3"
+            class="form-input"></textarea>
+        </div>
+
+        <!-- Signos Vitales -->
+        <div class="section-divider">
+          <label>Signos Vitales</label>
+        </div>
+
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="presionArterial">Presión Arterial (mmHg)</label>
+                <input 
+                  type="text" 
+                  id="presionArterial" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.presionArterial"
+                  placeholder="Ej: 120/80"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="frecuenciaCardiaca">Frecuencia Cardíaca (lpm)</label>
+                <input 
+                  type="number" 
+                  id="frecuenciaCardiaca" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.frecuenciaCardiaca"
+                  placeholder="Ej: 72"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="temperatura">Temperatura (°C)</label>
+                <input 
+                  type="text" 
+                  id="temperatura" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.temperatura"
+                  placeholder="Ej: 36.5"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="saturacionOxigeno">Saturación O2 (%)</label>
+                <input 
+                  type="number" 
+                  id="saturacionOxigeno" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.saturacionOxigeno"
+                  placeholder="Ej: 98"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="peso">Peso (kg)</label>
+                <input 
+                  type="text" 
+                  id="peso" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.peso"
+                  placeholder="Ej: 75.5"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="talla">Talla (cm)</label>
+                <input 
+                  type="text" 
+                  id="talla" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.talla"
+                  placeholder="Ej: 170"
+                  class="form-input">
+              </div>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+
+        <!-- Observaciones -->
+        <div class="form-group">
+          <label for="observaciones">Observaciones</label>
+          <textarea 
+            id="observaciones" 
+            [(ngModel)]="datosNuevaConsulta.observaciones"
+            placeholder="Notas adicionales..."
+            rows="2"
+            class="form-input"></textarea>
+        </div>
+      </div>
+      
+      <div class="popup-actions">
+        <button class="btn-secondary" (click)="cerrarPopupConsulta()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmarNuevaConsulta()" [disabled]="!isConsultaFormValid()">
+          <ion-icon name="add-circle"></ion-icon>
+          Guardar Consulta
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Popup para Subir Examen -->
   <div *ngIf="showExamenPopup" class="popup-overlay" (click)="cerrarPopupExamen()">
     <div class="popup-content" (click)="$event.stopPropagation()">

@@ -5,7 +5,7 @@ import {
   IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonBadge, IonGrid, IonRow, IonCol, IonList, IonItem, IonLabel,
   IonTextarea, IonTabs, IonTabButton, IonSpinner, IonToast,
-  IonInput, IonSelect, IonSelectOption,
+  IonInput, IonSelect, IonSelectOption, IonDatetime, IonDatetimeButton, IonModal,
   ModalController, ToastController
 } from '@ionic/angular/standalone';
 import { CommonModule, DOCUMENT } from '@angular/common';
@@ -94,6 +94,7 @@ interface OrdenExamenUI extends OrdenExamen {
     IonCard, IonCardContent, IonCardHeader, IonCardTitle,
     IonBadge, IonGrid, IonRow, IonCol,
     IonTextarea, IonInput, IonSelect, IonSelectOption,
+    IonDatetime, IonDatetimeButton, IonModal,
     CommonModule, FormsModule, TimelineComponent
   ],
 })
@@ -120,6 +121,26 @@ export class ConsultasPage implements OnInit, OnDestroy {
     tipoExamen: '',
     resultado: ''
   };
+  
+  // Popup de Nueva Consulta
+  showConsultaPopup = false;
+  formSubmitted = false;
+  datosNuevaConsulta = {
+    fechaConsulta: new Date().toISOString(),
+    motivoConsulta: '',
+    diagnostico: '',
+    tratamiento: '',
+    signosVitales: {
+      presionArterial: '',
+      frecuenciaCardiaca: null as number | null,
+      temperatura: '',
+      saturacionOxigeno: null as number | null,
+      peso: '',
+      talla: ''
+    },
+    observaciones: ''
+  };
+  maxDate = new Date().toISOString();
   
   // Edit mode
   isEditMode = false;
@@ -401,43 +422,30 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Open modal to create a new consultation
    * Guard prevents multiple simultaneous opens
    */
-  async nuevaConsulta() {
-    // Prevent multiple modal opens
-    if (this.isModalOpen) {
-      console.log('Modal already open, ignoring request');
+  nuevaConsulta() {
+    if (!this.paciente || !this.fichaId) {
+      this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
       return;
     }
     
-    if (!this.paciente || !this.fichaId) {
-      await this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
-      return;
-    }
-
-    this.isModalOpen = true;
-
-    try {
-      const presentingElement = this.document.querySelector('ion-router-outlet') as HTMLElement | null;
-      const modal = await this.modalCtrl.create({
-        component: NuevaConsultaModalComponent,
-        componentProps: {
-          pacienteId: this.paciente.id,
-          fichaMedicaId: this.fichaId,
-          pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
-        },
-        presentingElement: presentingElement ?? undefined
-      });
-
-      await modal.present();
-
-      const { data, role } = await modal.onWillDismiss();
-
-      if (role === 'confirm' && data) {
-        await this.guardarConsulta(data);
-      }
-    } finally {
-      // Always release the lock
-      this.isModalOpen = false;
-    }
+    // Abrir popup CSS en lugar de ModalController
+    this.showConsultaPopup = true;
+    this.formSubmitted = false;
+    this.datosNuevaConsulta = {
+      fechaConsulta: new Date().toISOString(),
+      motivoConsulta: '',
+      diagnostico: '',
+      tratamiento: '',
+      signosVitales: {
+        presionArterial: '',
+        frecuenciaCardiaca: null,
+        temperatura: '',
+        saturacionOxigeno: null,
+        peso: '',
+        talla: ''
+      },
+      observaciones: ''
+    };
   }
 
   /**
@@ -773,5 +781,51 @@ export class ConsultasPage implements OnInit, OnDestroy {
     await toast.present();
     
     this.cerrarPopupExamen();
+  }
+  
+  /**
+   * Cerrar popup de nueva consulta
+   */
+  cerrarPopupConsulta() {
+    this.showConsultaPopup = false;
+    this.formSubmitted = false;
+  }
+  
+  /**
+   * Validar formulario de consulta
+   */
+  isConsultaFormValid(): boolean {
+    return this.datosNuevaConsulta.motivoConsulta.trim().length > 0;
+  }
+  
+  /**
+   * Confirmar y guardar nueva consulta
+   */
+  async confirmarNuevaConsulta() {
+    this.formSubmitted = true;
+    
+    if (!this.isConsultaFormValid()) {
+      const toast = await this.toastCtrl.create({
+        message: 'El motivo de consulta es obligatorio',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    const consultaData = {
+      pacienteId: this.paciente?.id,
+      fichaMedicaId: this.fichaId,
+      fecha: Timestamp.fromDate(new Date(this.datosNuevaConsulta.fechaConsulta)),
+      motivoConsulta: this.datosNuevaConsulta.motivoConsulta,
+      diagnostico: this.datosNuevaConsulta.diagnostico,
+      tratamiento: this.datosNuevaConsulta.tratamiento,
+      signosVitales: this.datosNuevaConsulta.signosVitales,
+      observaciones: this.datosNuevaConsulta.observaciones
+    };
+    
+    await this.guardarConsulta(consultaData);
+    this.cerrarPopupConsulta();
   }
 }

@@ -1255,6 +1255,65 @@ ion-badge {
   --box-shadow: 0 4px 10px rgba(31, 136, 255, .13);
 }
 
+// Popup grande para Nueva Consulta
+.popup-large {
+  max-width: 700px;
+  max-height: 90vh;
+  
+  .popup-body {
+    max-height: calc(90vh - 180px);
+    overflow-y: auto;
+  }
+}
+
+.section-divider {
+  margin: 24px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #1f88ff;
+  
+  label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f88ff;
+  }
+}
+
+.form-input.invalid {
+  border-color: #f04141;
+  
+  &:focus {
+    border-color: #f04141;
+    box-shadow: 0 0 0 3px rgba(240, 65, 65, 0.1);
+  }
+}
+
+.error-message {
+  color: #f04141;
+  font-size: 0.875rem;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  ion-icon {
+    font-size: 18px;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(31, 136, 255, 0.3);
+    }
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
