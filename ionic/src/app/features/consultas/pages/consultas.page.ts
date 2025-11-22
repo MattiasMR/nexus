@@ -1,5 +1,6 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, IonIcon, IonButton,
   IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle,
@@ -158,6 +159,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   private subscriptions: Subscription[] = [];
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private sanitizer = inject(DomSanitizer);
   private pacientesService = inject(PacientesService);
   private fichasMedicasService = inject(FichasMedicasService);
   private consultasService = inject(ConsultasService);
@@ -995,10 +997,24 @@ export class ConsultasPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Abrir archivo en nueva pestaña
+   * Abrir archivo en visor embebido
    */
-  abrirArchivo(url: string) {
-    window.open(url, '_blank');
+  archivoViendose: any = null;
+  
+  abrirArchivo(archivo: any) {
+    console.log('📂 Abriendo archivo:', archivo.nombre);
+    this.archivoViendose = archivo;
+  }
+  
+  cerrarVisorArchivo() {
+    this.archivoViendose = null;
+  }
+  
+  /**
+   * Obtener URL sanitizada para iframe
+   */
+  getSafeUrl(url: string): SafeResourceUrl {
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
   /**

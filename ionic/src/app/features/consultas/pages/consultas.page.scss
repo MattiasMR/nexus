@@ -1573,6 +1573,172 @@ ion-badge {
   }
 }
 
+// Visor de Archivos
+.archivo-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.archivo-viewer-content {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1000px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.archivo-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  color: #fff;
+  
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.close-viewer-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  margin-left: 16px;
+  
+  ion-icon {
+    font-size: 24px;
+    color: #fff;
+  }
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.archivo-viewer-body {
+  flex: 1;
+  overflow: auto;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-viewer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  
+  img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.pdf-viewer {
+  width: 100%;
+  height: 100%;
+  
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+}
+
+.unsupported-viewer {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  
+  ion-icon {
+    font-size: 64px;
+    color: #999;
+    margin-bottom: 16px;
+  }
+  
+  p {
+    margin: 16px 0;
+    font-size: 1.1rem;
+  }
+}
+
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-top: 16px;
+  transition: transform 0.2s;
+  
+  ion-icon {
+    font-size: 20px;
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.archivo-viewer-footer {
+  padding: 16px 24px;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+}
+
+.archivo-info-footer {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: #666;
+  
+  span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

@@ -145,7 +145,7 @@
               </div>
             </div>
             <div class="archivo-actions">
-              <button class="icon-btn ver-btn" (click)="abrirArchivo(archivo.url)" title="Ver archivo">
+              <button class="icon-btn ver-btn" (click)="abrirArchivo(archivo)" title="Ver archivo">
                 <ion-icon name="eye"></ion-icon>
               </button>
               <button class="icon-btn delete-btn" (click)="eliminarArchivoExamen(archivo)" title="Eliminar">
@@ -536,6 +536,48 @@
       <div class="popup-actions">
         <button type="button" class="btn-secondary" (click)="cerrarPopupExamen()">Cancelar</button>
         <button type="button" class="btn-primary" (click)="guardarExamen()">Guardar Examen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visor de Archivos -->
+  <div *ngIf="archivoViendose" class="archivo-viewer-overlay" (click)="cerrarVisorArchivo()">
+    <div class="archivo-viewer-content" (click)="$event.stopPropagation()">
+      <div class="archivo-viewer-header">
+        <h3>{{ archivoViendose.nombre }}</h3>
+        <button class="close-viewer-btn" (click)="cerrarVisorArchivo()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="archivo-viewer-body">
+        <!-- Visor para imágenes -->
+        <div *ngIf="archivoViendose.tipo.startsWith('image/')" class="image-viewer">
+          <img [src]="archivoViendose.url" [alt]="archivoViendose.nombre">
+        </div>
+        
+        <!-- Visor para PDFs -->
+        <div *ngIf="archivoViendose.tipo === 'application/pdf'" class="pdf-viewer">
+          <iframe [src]="getSafeUrl(archivoViendose.url)" frameborder="0"></iframe>
+        </div>
+        
+        <!-- Mensaje para otros tipos -->
+        <div *ngIf="!archivoViendose.tipo.startsWith('image/') && archivoViendose.tipo !== 'application/pdf'" class="unsupported-viewer">
+          <ion-icon name="document-attach" style="font-size: 64px; color: #999;"></ion-icon>
+          <p>No se puede previsualizar este tipo de archivo</p>
+          <a [href]="archivoViendose.url" download="{{ archivoViendose.nombre }}" class="download-link">
+            <ion-icon name="download"></ion-icon>
+            Descargar archivo
+          </a>
+        </div>
+      </div>
+      
+      <div class="archivo-viewer-footer">
+        <div class="archivo-info-footer">
+          <span>Tipo: {{ archivoViendose.tipo }}</span>
+          <span>Tamaño: {{ formatFileSize(archivoViendose.tamanio) }}</span>
+          <span>Fecha: {{ archivoViendose.fechaSubida?.toDate ? (archivoViendose.fechaSubida.toDate() | date:'dd/MM/yyyy HH:mm') : (archivoViendose.fechaSubida | date:'dd/MM/yyyy HH:mm') }}</span>
+        </div>
       </div>
     </div>
   </div>
