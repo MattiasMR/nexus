@@ -210,12 +210,37 @@
           color: #7f8c8d;
           margin-bottom: 6px;
           font-weight: 500;
+          
+          .historial-usuario {
+            color: #3498db;
+            font-weight: 600;
+          }
         }
         
-        .historial-cambios {
-          font-size: 0.95rem;
+        .historial-descripcion {
+          font-size: 0.9rem;
           color: #2c3e50;
-          font-weight: 500;
+          font-weight: 600;
+          margin-bottom: 12px;
+        }
+        
+        .historial-texto {
+          background: #fff;
+          padding: 12px;
+          border-radius: 6px;
+          border: 1px solid #e0e0e0;
+          max-height: 200px;
+          overflow-y: auto;
+          
+          pre {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #2c3e50;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+          }
         }
       }
     }

@@ -996,8 +996,9 @@ export class ConsultasPage implements OnInit, OnDestroy {
                 fechaSubida: Timestamp.now(),
                 subidoPor: 'system', // Aquí deberías poner el ID del usuario actual
                 textoExtraido: textoExtraido || undefined,
+                textoActual: textoExtraido || undefined, // La versión actual es la del OCR inicial
                 confianzaOCR: confianzaOCR > 0 ? confianzaOCR : undefined,
-                historialEdiciones: []
+                historialVersiones: []
               }
             ]
           }
@@ -1104,7 +1105,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
    */
   iniciarEdicionTexto() {
     this.editandoTexto = true;
-    this.textoEnEdicion = this.archivoViendose.textoEditado || this.archivoViendose.textoExtraido || '';
+    this.textoEnEdicion = this.archivoViendose.textoActual || this.archivoViendose.textoExtraido || '';
   }
 
   /**
@@ -1144,24 +1145,40 @@ export class ConsultasPage implements OnInit, OnDestroy {
         throw new Error('No se encontró el documento');
       }
 
-      // Crear entrada en el historial
-      const textoAnterior = this.archivoViendose.textoEditado || this.archivoViendose.textoExtraido || '';
-      const edicion = {
-        fecha: Timestamp.now(),
-        usuario: 'system', // Aquí deberías poner el ID del usuario actual
-        textoAnterior: textoAnterior,
-        textoNuevo: this.textoEnEdicion,
-        cambios: this.generarDescripcionCambios(textoAnterior, this.textoEnEdicion)
-      };
+      // Obtener el texto actual antes de modificar
+      const textoAnterior = this.archivoViendose.textoActual || this.archivoViendose.textoExtraido || '';
+      
+      // Solo guardar en historial si hay texto anterior diferente
+      const historialActualizado = [...(examen.documentos[docIndex].historialVersiones || [])];
+      
+      if (textoAnterior && textoAnterior !== this.textoEnEdicion) {
+        // Guardar la versión anterior en el historial
+        const versionAnterior = {
+          fecha: Timestamp.now(),
+          usuario: 'system', // Aquí deberías poner el ID del usuario actual
+          texto: textoAnterior,
+          descripcion: this.generarDescripcionVersion(textoAnterior, this.textoEnEdicion)
+        };
+        historialActualizado.push(versionAnterior);
+      } else if (!textoAnterior && this.textoEnEdicion) {
+        // Primera edición, guardar versión OCR original si existe
+        const textoOCR = this.archivoViendose.textoExtraido;
+        if (textoOCR) {
+          const versionOCR = {
+            fecha: this.archivoViendose.fechaSubida || Timestamp.now(),
+            usuario: 'OCR',
+            texto: textoOCR,
+            descripcion: 'Versión original extraída por OCR'
+          };
+          historialActualizado.push(versionOCR);
+        }
+      }
 
-      // Actualizar documento
+      // Actualizar documento con la nueva versión actual
       examen.documentos[docIndex] = {
         ...examen.documentos[docIndex],
-        textoEditado: this.textoEnEdicion,
-        historialEdiciones: [
-          ...(examen.documentos[docIndex].historialEdiciones || []),
-          edicion
-        ]
+        textoActual: this.textoEnEdicion, // Guardar como versión actual
+        historialVersiones: historialActualizado
       };
 
       // Guardar en Firestore
@@ -1170,8 +1187,8 @@ export class ConsultasPage implements OnInit, OnDestroy {
       // Actualizar vista local
       this.archivoViendose = {
         ...this.archivoViendose,
-        textoEditado: this.textoEnEdicion,
-        historialEdiciones: examen.documentos[docIndex].historialEdiciones
+        textoActual: this.textoEnEdicion,
+        historialVersiones: examen.documentos[docIndex].historialVersiones
       };
 
       // Recargar archivos
@@ -1201,24 +1218,30 @@ export class ConsultasPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Generar descripción de cambios entre dos textos
+   * Generar descripción de la versión
    */
-  private generarDescripcionCambios(textoAnterior: string, textoNuevo: string): string {
-    if (!textoAnterior) {
-      return 'Texto inicial agregado';
+  private generarDescripcionVersion(textoAnterior: string, textoNuevo: string): string {
+    if (!textoNuevo || textoNuevo.trim() === '') {
+      return 'Texto eliminado completamente';
+    }
+    
+    if (!textoAnterior || textoAnterior.trim() === '') {
+      return 'Primera versión del texto';
     }
     
     const longitudAnterior = textoAnterior.length;
     const longitudNueva = textoNuevo.length;
     const diferencia = longitudNueva - longitudAnterior;
     
-    if (diferencia > 0) {
-      return `Se agregaron ${diferencia} caracteres`;
-    } else if (diferencia < 0) {
-      return `Se eliminaron ${Math.abs(diferencia)} caracteres`;
-    } else {
-      return 'Texto modificado (misma longitud)';
+    if (diferencia > 50) {
+      return `Contenido ampliado (+${diferencia} caracteres)`;
+    } else if (diferencia < -50) {
+      return `Contenido reducido (${diferencia} caracteres)`;
+    } else if (Math.abs(diferencia) <= 50) {
+      return 'Texto modificado';
     }
+    
+    return 'Versión editada';
   }
 
   /**
