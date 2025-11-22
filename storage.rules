@@ -42,6 +42,16 @@ service firebase.storage {
       allow delete: if isAuthenticated() && isOwner(userId);
     }
     
+    // Exámenes médicos de pacientes
+    match /examenes/{pacienteId}/{fileName} {
+      // Permitir lectura y escritura para desarrollo (cambiar en producción)
+      allow read, write: if true;
+      // Para producción, usar:
+      // allow read: if isAuthenticated();
+      // allow write: if isAuthenticated() && isValidSize() && isValidFileType();
+      // allow delete: if isAuthenticated();
+    }
+    
     // Fotos de perfil
     match /profile-photos/{userId}/{fileName} {
       allow read: if isAuthenticated();

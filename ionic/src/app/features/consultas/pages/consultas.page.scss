@@ -1432,6 +1432,147 @@ ion-badge {
   }
 }
 
+// Estilos para la sección de Archivos de Exámenes
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  
+  ion-icon {
+    font-size: 64px;
+    color: #ccc;
+  }
+  
+  p {
+    margin: 16px 0 0 0;
+    color: #999;
+    
+    &:last-child {
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+  }
+}
+
+.archivos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.archivo-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.archivo-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ion-icon {
+    font-size: 28px;
+    color: #fff;
+  }
+}
+
+.archivo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.archivo-nombre {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archivo-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  
+  .examen-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  
+  .archivo-fecha,
+  .archivo-size {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+  }
+}
+
+.archivo-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  
+  ion-icon {
+    font-size: 20px;
+  }
+  
+  &.ver-btn {
+    background: #e3f2fd;
+    
+    ion-icon {
+      color: #1976d2;
+    }
+    
+    &:hover {
+      background: #bbdefb;
+    }
+  }
+  
+  &.delete-btn {
+    background: #ffebee;
+    
+    ion-icon {
+      color: #d32f2f;
+    }
+    
+    &:hover {
+      background: #ffcdd2;
+    }
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

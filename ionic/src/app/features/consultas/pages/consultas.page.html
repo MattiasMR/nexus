@@ -111,6 +111,52 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- SECCIÓN: Archivos de Exámenes -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <div class="section-header">
+          <ion-icon name="folder-open" class="section-icon"></ion-icon>
+          <ion-card-title>Archivos de Exámenes</ion-card-title>
+          <ion-badge color="primary">{{ archivosExamenes.length }}</ion-badge>
+        </div>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <div *ngIf="archivosExamenes.length === 0" class="empty-state">
+          <ion-icon name="cloud-upload-outline" style="font-size: 64px; color: #ccc;"></ion-icon>
+          <p style="color: #999; margin-top: 16px;">No hay archivos de exámenes subidos</p>
+          <p style="color: #999; font-size: 0.9rem;">Usa el botón "Subir Examen" para agregar archivos</p>
+        </div>
+        <div class="archivos-grid" *ngIf="archivosExamenes.length > 0">
+          <div *ngFor="let archivo of archivosExamenes" class="archivo-card">
+            <div class="archivo-icon">
+              <ion-icon [name]="getFileIcon(archivo.tipo)"></ion-icon>
+            </div>
+            <div class="archivo-info">
+              <h4 class="archivo-nombre">{{ archivo.nombre }}</h4>
+              <div class="archivo-metadata">
+                <ion-badge [color]="getTipoExamenColor(archivo.nombreExamen)" class="examen-badge">
+                  {{ archivo.nombreExamen }}
+                </ion-badge>
+                <span class="archivo-fecha">
+                  {{ archivo.fechaSubida?.toDate ? archivo.fechaSubida.toDate() : archivo.fechaSubida | date:'dd/MM/yyyy' }}
+                </span>
+                <span class="archivo-size">{{ formatFileSize(archivo.tamanio) }}</span>
+              </div>
+            </div>
+            <div class="archivo-actions">
+              <button class="icon-btn ver-btn" (click)="abrirArchivo(archivo.url)" title="Ver archivo">
+                <ion-icon name="eye"></ion-icon>
+              </button>
+              <button class="icon-btn delete-btn" (click)="eliminarArchivoExamen(archivo)" title="Eliminar">
+                <ion-icon name="trash"></ion-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
     <!-- SECCIÓN: Alertas Médicas -->
     <ion-card class="section-card">
       <ion-card-header>
@@ -488,8 +534,8 @@
       </div>
       
       <div class="popup-actions">
-        <button class="btn-secondary" (click)="cerrarPopupExamen()">Cancelar</button>
-        <button class="btn-primary" (click)="guardarExamen()">Guardar Examen</button>
+        <button type="button" class="btn-secondary" (click)="cerrarPopupExamen()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarExamen()">Guardar Examen</button>
       </div>
     </div>
   </div>
