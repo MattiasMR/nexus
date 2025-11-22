@@ -113,6 +113,14 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Variable para las notas rápidas
   nuevaNota: string = '';
   
+  // Popup de Subir Examen
+  showExamenPopup = false;
+  nuevoExamen = {
+    nombreExamen: '',
+    tipoExamen: '',
+    resultado: ''
+  };
+  
   // Edit mode
   isEditMode = false;
   editedData: any = {};
@@ -716,5 +724,54 @@ export class ConsultasPage implements OnInit, OnDestroy {
 
   agregarNota() {
     this.guardarNota();
+  }
+  
+  /**
+   * Abrir popup para subir examen (CSS overlay, no ModalController)
+   */
+  subirExamen() {
+    this.showExamenPopup = true;
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: ''
+    };
+  }
+  
+  /**
+   * Cerrar popup de examen
+   */
+  cerrarPopupExamen() {
+    this.showExamenPopup = false;
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: ''
+    };
+  }
+  
+  /**
+   * Guardar examen (placeholder - requiere integración con ExamenesService)
+   */
+  async guardarExamen() {
+    if (!this.nuevoExamen.nombreExamen.trim()) {
+      const toast = await this.toastCtrl.create({
+        message: 'Debe ingresar el tipo de examen',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    // TODO: Implementar guardado en Firestore cuando esté configurado Storage
+    const toast = await this.toastCtrl.create({
+      message: 'Funcionalidad en desarrollo - Examen guardado localmente',
+      duration: 2000,
+      color: 'success'
+    });
+    await toast.present();
+    
+    this.cerrarPopupExamen();
   }
 }

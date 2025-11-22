@@ -24,6 +24,11 @@
             Nueva Consulta
           </ion-button>
           
+          <ion-button (click)="subirExamen()" fill="solid" class="subir-examen-btn">
+            <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
+            Subir Examen
+          </ion-button>
+          
           <ion-button (click)="verMedicacion()" fill="outline" class="medicacion-btn">
             <ion-icon name="medical" slot="start"></ion-icon>
             Ver Medicación
@@ -230,5 +235,57 @@
       </ion-card-content>
     </ion-card>
 
+  </div>
+
+  <!-- Popup para Subir Examen -->
+  <div *ngIf="showExamenPopup" class="popup-overlay" (click)="cerrarPopupExamen()">
+    <div class="popup-content" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Subir Examen Médico</h2>
+        <button class="close-btn" (click)="cerrarPopupExamen()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <p class="patient-info">Paciente: {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</p>
+        
+        <div class="form-group">
+          <label for="nombreExamen">Tipo de Examen *</label>
+          <input 
+            type="text" 
+            id="nombreExamen" 
+            [(ngModel)]="nuevoExamen.nombreExamen"
+            placeholder="Ej: Hemograma, Radiografía, etc."
+            class="form-input">
+        </div>
+        
+        <div class="form-group">
+          <label for="tipoExamen">Categoría</label>
+          <select id="tipoExamen" [(ngModel)]="nuevoExamen.tipoExamen" class="form-input">
+            <option value="">Seleccionar...</option>
+            <option value="laboratorio">Laboratorio</option>
+            <option value="imagen">Imagen</option>
+            <option value="biopsia">Biopsia</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="resultadoExamen">Resultado/Observaciones</label>
+          <textarea 
+            id="resultadoExamen" 
+            [(ngModel)]="nuevoExamen.resultado"
+            placeholder="Ingrese los resultados o hallazgos del examen"
+            rows="4"
+            class="form-input"></textarea>
+        </div>
+      </div>
+      
+      <div class="popup-actions">
+        <button class="btn-secondary" (click)="cerrarPopupExamen()">Cancelar</button>
+        <button class="btn-primary" (click)="guardarExamen()">Guardar Examen</button>
+      </div>
+    </div>
   </div>
 </ion-content>
