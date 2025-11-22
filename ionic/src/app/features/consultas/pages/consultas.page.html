@@ -24,6 +24,11 @@
             Nueva Consulta
           </ion-button>
           
+          <ion-button (click)="subirExamen()" fill="solid" color="secondary" class="subir-examen-btn">
+            <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
+            Subir Examen
+          </ion-button>
+          
           <ion-button (click)="verMedicacion()" fill="outline" class="medicacion-btn">
             <ion-icon name="medical" slot="start"></ion-icon>
             Ver Medicación
@@ -231,4 +236,66 @@
     </ion-card>
 
   </div>
+
+  <!-- POPUP OVERLAY: Subir Examen -->
+  <div *ngIf="showExamenPopup" class="popup-overlay" (click)="cerrarPopupExamen()">
+    <div class="popup-content" (click)="$event.stopPropagation()">
+      <button class="close-btn" (click)="cerrarPopupExamen()">
+        <ion-icon name="close"></ion-icon>
+      </button>
+      
+      <div class="popup-body">
+        <h2>Subir Resultado de Examen</h2>
+        <p class="patient-info">Paciente: {{ paciente?.nombre }} {{ paciente?.apellido }}</p>
+        
+        <div class="form-group">
+          <label>Nombre del Examen *</label>
+          <ion-input
+            [(ngModel)]="nuevoExamen.nombreExamen"
+            placeholder="Ej: Hemograma, Radiografía..."
+            fill="outline"
+          ></ion-input>
+        </div>
+
+        <div class="form-group">
+          <label>Tipo de Examen</label>
+          <ion-select
+            [(ngModel)]="nuevoExamen.tipoExamen"
+            placeholder="Selecciona un tipo"
+            fill="outline"
+          >
+            <ion-select-option value="laboratorio">Laboratorio</ion-select-option>
+            <ion-select-option value="imagen">Imagen (Radiografía, TAC, etc.)</ion-select-option>
+            <ion-select-option value="biopsia">Biopsia</ion-select-option>
+            <ion-select-option value="funcional">Funcional (ECG, Espirometría, etc.)</ion-select-option>
+            <ion-select-option value="otro">Otro</ion-select-option>
+          </ion-select>
+        </div>
+
+        <div class="form-group">
+          <label>Resultado (Opcional)</label>
+          <ion-textarea
+            [(ngModel)]="nuevoExamen.resultado"
+            placeholder="Describe brevemente el resultado..."
+            rows="3"
+            fill="outline"
+          ></ion-textarea>
+        </div>
+
+        <div class="popup-actions">
+          <button class="btn-secondary" (click)="cerrarPopupExamen()">
+            Cancelar
+          </button>
+          <button 
+            class="btn-primary" 
+            (click)="guardarExamen()"
+            [disabled]="!nuevoExamen.nombreExamen"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </ion-content>

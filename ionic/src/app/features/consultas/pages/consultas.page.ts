@@ -21,6 +21,7 @@ import { ExamenesService } from '../../examenes/data/examenes.service';
 
 // Components
 import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/nueva-consulta-modal.component';
+import { SubirExamenModalComponent } from '../components/subir-examen-modal/subir-examen-modal.component';
 import { TimelineComponent, TimelineItem } from '../../../shared/components/timeline/timeline.component';
 
 // Modelos
@@ -116,6 +117,14 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Edit mode
   isEditMode = false;
   editedData: any = {};
+  
+  // Popup: Subir Examen
+  showExamenPopup = false;
+  nuevoExamen = {
+    nombreExamen: '',
+    tipoExamen: '',
+    resultado: ''
+  };
   
   // Timeline items - cached property instead of getter
   timelineItems: TimelineItem[] = [];
@@ -482,6 +491,52 @@ export class ConsultasPage implements OnInit, OnDestroy {
       console.error('Error saving consultation:', error);
       await this.showToast('Error al guardar la consulta', 'danger');
     }
+  }
+
+  /**
+   * Open popup to upload exam result
+   */
+  subirExamen() {
+    if (!this.paciente || !this.fichaId) {
+      this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
+      return;
+    }
+
+    // Limpiar datos previos
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: ''
+    };
+
+    // Mostrar popup
+    this.showExamenPopup = true;
+  }
+
+  /**
+   * Close exam upload popup
+   */
+  cerrarPopupExamen() {
+    this.showExamenPopup = false;
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: ''
+    };
+  }
+
+  /**
+   * Save exam data (placeholder)
+   */
+  async guardarExamen() {
+    if (!this.nuevoExamen.nombreExamen) {
+      await this.showToast('Ingresa el nombre del examen', 'warning');
+      return;
+    }
+
+    console.log('Datos del examen:', this.nuevoExamen);
+    await this.showToast('Funcionalidad en desarrollo', 'warning');
+    this.cerrarPopupExamen();
   }
 
   /**
