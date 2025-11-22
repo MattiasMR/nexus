@@ -1,6 +1,7 @@
 /// Constantes de permisos del sistema
-/// Basado en el modelo de base de datos
+library;
 
+/// Basado en el modelo de base de datos
 class AppPermissions {
   // ========== PERMISOS MÉDICOS (Flutter) ==========
   

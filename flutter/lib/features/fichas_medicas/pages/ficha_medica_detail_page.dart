@@ -102,6 +102,7 @@ class _FichaMedicaDetailPageState extends State<FichaMedicaDetailPage>
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
+          final messenger = ScaffoldMessenger.of(context);
           final result = await Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (_) => NuevaAtencionPage(
@@ -112,8 +113,9 @@ class _FichaMedicaDetailPageState extends State<FichaMedicaDetailPage>
           );
           
           // Si se guardó la consulta, mostrar confirmación
-          if (result == true && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+          if (result == true) {
+            if (!mounted) return;
+            messenger.showSnackBar(
               const SnackBar(
                 content: Text('Consulta registrada correctamente'),
                 backgroundColor: Colors.green,

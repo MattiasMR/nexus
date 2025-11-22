@@ -9,9 +9,33 @@ class RecetasService {
     return _db
         .collection(_collection)
         .where('idPaciente', isEqualTo: idPaciente)
-        .orderBy('fecha', descending: true)
+        .orderBy('fechaEmision', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => Receta.fromFirestore(doc)).toList());
+  }
+
+  /// Obtener recetas vigentes
+  Stream<List<Receta>> obtenerRecetasVigentes(String idPaciente) {
+    return _db
+        .collection(_collection)
+        .where('idPaciente', isEqualTo: idPaciente)
+        .where('estado', isEqualTo: 'activa')
+        .orderBy('fechaEmision', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Receta.fromFirestore(doc)).toList());
+  }
+
+  /// Obtener recetas anteriores
+  Stream<List<Receta>> obtenerRecetasAnteriores(String idPaciente) {
+    return _db
+        .collection(_collection)
+        .where('idPaciente', isEqualTo: idPaciente)
+        .where('estado', isEqualTo: 'vencida')
+        .orderBy('fechaEmision', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Receta.fromFirestore(doc)).toList());
   }
 
   Future<String> createReceta(Receta receta) async {

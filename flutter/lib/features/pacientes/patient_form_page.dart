@@ -277,32 +277,24 @@ class _PatientFormPageState extends State<PatientFormPage> {
           const SizedBox(width: 12),
           const Text('Sexo *', style: TextStyle(fontSize: 16)),
           const Spacer(),
-          // ignore: deprecated_member_use
-          Radio<String>(
-            value: 'M',
-            groupValue: _sexo,
-            // ignore: deprecated_member_use
-            onChanged: (value) => setState(() => _sexo = value!),
+          Expanded(
+            child: RadioGroup<String>(
+              groupValue: _sexo,
+              onChanged: (value) => setState(() => _sexo = value!),
+              child: Row(
+                children: [
+                  Radio<String>(value: 'M'),
+                  const Text('M'),
+                  const SizedBox(width: 8),
+                  Radio<String>(value: 'F'),
+                  const Text('F'),
+                  const SizedBox(width: 8),
+                  Radio<String>(value: 'Otro'),
+                  const Text('Otro'),
+                ],
+              ),
+            ),
           ),
-          const Text('M'),
-          const SizedBox(width: 8),
-          // ignore: deprecated_member_use
-          Radio<String>(
-            value: 'F',
-            groupValue: _sexo,
-            // ignore: deprecated_member_use
-            onChanged: (value) => setState(() => _sexo = value!),
-          ),
-          const Text('F'),
-          const SizedBox(width: 8),
-          // ignore: deprecated_member_use
-          Radio<String>(
-            value: 'Otro',
-            groupValue: _sexo,
-            // ignore: deprecated_member_use
-            onChanged: (value) => setState(() => _sexo = value!),
-          ),
-          const Text('Otro'),
         ],
       ),
     );

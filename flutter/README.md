@@ -1,124 +1,135 @@
-# Nexus Flutter - Aplicación para Personal Médico
+# Nexus Flutter - Portal del Paciente
 
-Aplicación móvil nativa diseñada para médicos y profesionales de la salud del sistema Nexus. Permite gestionar atenciones médicas, consultas, recetas y seguimiento de pacientes en los hospitales donde el profesional está asignado.
+Aplicación móvil nativa diseñada para **pacientes** del sistema Nexus Medical. Permite a los pacientes gestionar su salud de manera fácil y segura: ver su ficha médica, subir documentos, consultar recetas y agendar citas.
 
 ## 🏥 Propósito de la Aplicación
 
 **Nexus Flutter** es parte de un ecosistema multi-aplicación:
 
-- **Flutter (esta app)**: Para **personal médico** (doctores, enfermeras, especialistas)
-  - Gestionar consultas de pacientes en hospitales asignados
+- **Flutter (esta app)**: Para **PACIENTES**
+  - Ver mi ficha médica completa
+  - Acceder a mis recetas médicas
+  - Ver resultados de exámenes
+  - Subir documentos médicos (imágenes, PDFs)
+  - Agendar y gestionar citas médicas
+  - Consultar historial de atenciones
+  - Actualizar datos personales
+
+- **Ionic Mobile**: Para **MÉDICOS** (doctores, enfermeras, especialistas)
+  - Gestionar consultas de pacientes
   - Crear y actualizar fichas médicas
   - Prescribir recetas médicas
   - Solicitar exámenes de laboratorio
   - Registrar hospitalizaciones
-  - Ver historial médico de pacientes bajo su cuidado
 
-- **Laravel Web**: Para **administradores hospitalarios y super admins**
+- **Laravel Web**: Para **ADMINISTRADORES** hospitalarios y super admins
   - Gestión de usuarios y permisos
   - Administración de catálogos (medicamentos, exámenes)
   - Reportes y estadísticas del hospital
   - Configuración del sistema
 
-- **Ionic Mobile**: Para **pacientes**
-  - Ver su propia ficha médica completa
-  - Acceder a recetas y exámenes
-  - Subir resultados de exámenes
-  - Consultar historial de atenciones
-
 ## 🔐 Sistema de Autenticación
 
 Utiliza **Firebase Authentication** con base de datos **Firestore** compartida entre las tres aplicaciones.
 
-### Roles y Permisos
+### Funcionalidades de Autenticación
 
-El personal médico puede:
-- ✅ Ver y gestionar pacientes en **hospitales asignados solamente**
-- ✅ Crear consultas médicas
-- ✅ Prescribir recetas
-- ✅ Solicitar exámenes
-- ✅ Registrar hospitalizaciones
-- ❌ NO puede ver datos de hospitales no asignados
-- ❌ NO puede gestionar usuarios o configuraciones del sistema
+- ✅ **Registro de nuevos pacientes** con email y contraseña
+- ✅ **Inicio de sesión** con credenciales
+- ✅ **Recuperación de contraseña** por email
+- ✅ **Recordar sesión** en el dispositivo
+- ✅ **Cierre de sesión** seguro
 
-### Multi-Hospital
+### Datos del Paciente
 
-Un profesional médico puede:
-- Estar asignado a **múltiples hospitales** simultáneamente
-- Ver pacientes que se han atendido en **cualquiera de sus hospitales**
-- Los datos se filtran automáticamente según `hospitalesAsignados`
+Cada paciente tiene:
+- Información personal (nombre, apellido, RUT, teléfono)
+- Email de acceso
+- Fecha de nacimiento y sexo (opcional)
+- Previsión de salud (opcional)
+- Contacto de emergencia (opcional)
+- Foto de perfil (opcional)
 
 ## 🚀 Tecnologías
 
 - **Flutter**: SDK 3.9.2+
 - **Dart**: 3.9.2+
-- **Firebase Auth**: Autenticación unificada
+- **Firebase Auth**: Autenticación de pacientes
 - **Cloud Firestore**: Base de datos en tiempo real
-- **Platforms**: Android, iOS, Web, Windows, Linux, macOS
+- **Provider**: Gestión de estado
+- **go_router**: Navegación declarativa
+- **Platforms**: Android, iOS, Web
 
 ## ✨ Características Implementadas
 
-- ✅ Lista de Pacientes con datos en tiempo real
-- ✅ Detalles de Paciente
-- ✅ Formulario de Paciente (Crear/Editar)
-- ✅ Lista de Fichas Médicas
-- ✅ Integración con Firebase Firestore
-- ✅ Widget de Clima (API pública)
-- ✅ Diseño Material 3
-- ✅ Navegación fluida
+### Autenticación
+- ✅ Pantalla de Login
+- ✅ Pantalla de Registro
+- ✅ Recuperación de contraseña
+- ✅ Gestión de sesión persistente
+- ✅ AuthProvider con Provider pattern
 
-## 🔜 Próximas Características (Autenticación y Control de Acceso)
+### Dashboard
+- ✅ Pantalla principal con accesos rápidos
+- ✅ Bienvenida personalizada
+- ✅ Grid de opciones principales
 
-- [ ] **Login Screen** con Firebase Auth
-- [ ] **Gestión de sesión** y persistencia
-- [ ] **Selector de hospital** (para médicos multi-hospital)
-- [ ] **Verificación de permisos** granulares
-- [ ] **Filtrado automático** por hospitales asignados
-- [ ] **Perfil de usuario** médico
-- [ ] **Logout y cambio de hospital**
+## 🔜 Próximas Características
+
+### Ficha Médica
+- [ ] Ver historial de consultas
+- [ ] Ver diagnósticos
+- [ ] Ver antecedentes médicos
+- [ ] Actualizar información personal
+
+### Documentos
+- [ ] Subir documentos (imágenes, PDFs)
+- [ ] Ver documentos subidos
+- [ ] Compartir documentos con médicos
+- [ ] Categorizar documentos
+
+### Citas Médicas
+- [ ] Agendar nueva cita
+- [ ] Ver citas programadas
+- [ ] Cancelar o reprogramar citas
+- [ ] Notificaciones de recordatorio
+
+### Recetas
+- [ ] Ver recetas activas
+- [ ] Ver historial de recetas
+- [ ] Detalles de medicamentos
 
 ## 📁 Estructura del Proyecto
 
 ```
 lib/
 ├── features/              # Módulos por funcionalidad
-│   ├── auth/             # 🆕 Autenticación y login
+│   ├── auth/             # ✅ Autenticación
 │   │   ├── login_page.dart
-│   │   ├── hospital_selector_page.dart
-│   │   └── profile_page.dart
-│   ├── pacientes/        # Gestión de pacientes
-│   │   ├── patient_list_page.dart
-│   │   ├── patient_detail_page.dart
-│   │   └── patient_form_page.dart
-│   ├── consultas/        # 🆕 Gestión de consultas médicas
-│   ├── recetas/          # 🆕 Prescripción de recetas
-│   └── examenes/         # 🆕 Solicitud de exámenes
+│   │   └── register_page.dart
+│   ├── ficha_medica/     # 🔜 Mi ficha médica
+│   ├── documentos/       # 🔜 Mis documentos
+│   ├── citas/            # 🔜 Mis citas
+│   └── recetas/          # 🔜 Mis recetas
 ├── models/               # Modelos de datos
-│   ├── usuario.dart      # 🆕 Modelo de usuario/médico
-│   ├── hospital.dart     # 🆕 Modelo de hospital
-│   ├── paciente.dart
-│   ├── ficha_medica.dart
-│   ├── consulta.dart     # 🆕
-│   └── receta.dart       # 🆕
+│   ├── usuario.dart      # ✅ Modelo de paciente
+│   ├── documento.dart    # 🔜 Modelo de documento
+│   ├── cita.dart         # 🔜 Modelo de cita
+│   └── receta.dart       # 🔜 Modelo de receta
 ├── services/             # Servicios de datos
-│   ├── auth_service.dart         # 🆕 Autenticación
-│   ├── permisos_service.dart     # 🆕 Verificación de permisos
-│   ├── hospitales_service.dart   # 🆕 Gestión de hospitales
-│   ├── pacientes_service.dart    
-│   ├── fichas_medicas_service.dart
-│   ├── consultas_service.dart    # 🆕
-│   └── weather_service.dart
+│   ├── auth_service.dart         # ✅ Autenticación
+│   ├── documentos_service.dart   # 🔜 Gestión de documentos
+│   ├── citas_service.dart        # 🔜 Gestión de citas
+│   └── recetas_service.dart      # 🔜 Gestión de recetas
+├── providers/            # State management
+│   └── auth_provider.dart        # ✅ Provider de autenticación
 ├── shared/               # Componentes compartidos
 │   └── widgets/
 │       ├── custom_button.dart
-│       ├── empty_state.dart
-│       ├── protected_route.dart  # 🆕 Protección de rutas
-│       └── weather_widget.dart
+│       └── empty_state.dart
 ├── utils/                # Utilidades
 │   ├── app_colors.dart
-│   ├── avatar_utils.dart
-│   ├── validators.dart
-│   └── permission_constants.dart # 🆕 Constantes de permisos
+│   └── validators.dart
 ├── firebase_options.dart
 └── main.dart
 ```
@@ -236,16 +247,24 @@ dependencies:
   # Firebase
   firebase_core: ^4.2.0
   firebase_auth: ^5.3.3          # 🆕 Autenticación
+## 📦 Dependencias Principales
+
+```yaml
+dependencies:
+  flutter: sdk
+  
+  # Firebase
+  firebase_core: ^4.0.1
+  firebase_auth: ^6.0.3          # ✅ Autenticación
   cloud_firestore: ^6.0.3
   
   # Estado y Navigation
-  provider: ^6.1.2               # 🆕 Gestión de estado
-  go_router: ^14.0.0             # 🆕 Navegación y rutas protegidas
+  provider: ^6.1.2               # ✅ Gestión de estado
+  go_router: ^14.6.2             # ✅ Navegación declarativa
   
   # Utilidades
   intl: ^0.19.0
-  http: ^1.2.0
-  shared_preferences: ^2.2.0     # 🆕 Persistencia local
+  shared_preferences: ^2.3.3     # ✅ Persistencia local
   
   # UI
   cupertino_icons: ^1.0.8
@@ -259,134 +278,177 @@ dev_dependencies:
 
 ### Colecciones utilizadas
 
-- `usuarios`: Autenticación y datos de usuarios del sistema
-- `hospitales`: Información de hospitales del sistema
-- `permisos-usuario`: Permisos granulares por usuario y hospital
-- `pacientes`: Datos de pacientes (filtrado por hospitalesAsignados)
-- `profesionales`: Datos del personal médico
-- `fichas-medicas`: Fichas médicas de pacientes
-- `consultas`: Consultas médicas (filtradas por hospitalesAsignados)
-- `recetas`: Recetas médicas prescritas
-- `examenes`: Órdenes de exámenes solicitados
-- `hospitalizaciones`: Registros de hospitalizaciones
+- `pacientes`: **Datos del paciente** (documento por usuario autenticado)
+  - Información personal (nombre, RUT, teléfono, etc.)
+  - Datos de contacto de emergencia
+  - Previsión de salud
+  
+- `fichas-medicas`: **Ficha médica del paciente**
+  - Antecedentes médicos
+  - Alergias
+  - Enfermedades crónicas
+  
+- `consultas`: **Historial de consultas médicas**
+  - Diagnósticos
+  - Tratamientos
+  - Notas médicas
+  
+- `documentos-paciente`: **Documentos subidos por el paciente**
+  - Exámenes de laboratorio
+  - Imágenes médicas
+  - PDFs y archivos
+  
+- `recetas`: **Recetas médicas del paciente**
+  - Medicamentos prescritos
+  - Dosificación
+  - Vigencia
+
+- `citas`: **Citas médicas agendadas**
+  - Fecha y hora
+  - Médico asignado
+  - Hospital
+  - Estado (pendiente, confirmada, cancelada)
 
 ### Reglas de Seguridad Firestore
 
 El sistema implementa reglas de seguridad basadas en:
-- **Rol del usuario** (`custom claims` en Firebase Auth)
-- **Hospitales asignados** (array en documento de usuario)
-- **Permisos granulares** (colección `permisos-usuario`)
+- **Autenticación del usuario** (debe estar logueado)
+- **UID del paciente** (solo puede ver sus propios datos)
 
-Ejemplo de regla para médicos:
+Ejemplo de reglas para pacientes:
 ```javascript
-// Solo puede ver pacientes de hospitales asignados
+// Solo puede ver su propia ficha médica
 match /pacientes/{pacienteId} {
-  allow read: if request.auth != null 
-    && request.auth.token.rol == 'medico'
-    && request.auth.token.hospitalesAsignados.hasAny(
-      resource.data.hospitalesAtendido
-    );
+  allow read, write: if request.auth != null 
+    && request.auth.uid == pacienteId;
 }
 
-// Solo puede crear consultas en hospitales asignados
+// Solo puede ver sus propias consultas
 match /consultas/{consultaId} {
+  allow read: if request.auth != null
+    && request.auth.uid == resource.data.idPaciente;
+}
+
+// Puede subir sus propios documentos
+match /documentos-paciente/{documentoId} {
   allow create: if request.auth != null
-    && request.auth.token.rol == 'medico'
-    && request.auth.token.hospitalesAsignados.hasAny([
-      request.resource.data.idHospital
-    ]);
+    && request.auth.uid == request.resource.data.idPaciente;
+  allow read, update, delete: if request.auth != null
+    && request.auth.uid == resource.data.idPaciente;
 }
 ```
 
-## 🚧 Próximas Características
+## 🚧 Roadmap de Desarrollo
 
-### Fase 1: Autenticación (En Progreso)
-- [ ] Login con Firebase Auth (email/password)
-- [ ] Gestión de sesión persistente
-- [ ] Selector de hospital activo (para médicos multi-hospital)
-- [ ] Pantalla de perfil de usuario
-- [ ] Logout y manejo de tokens
-- [ ] Verificación de permisos en tiempo real
+### ✅ Fase 1: Autenticación (COMPLETADA)
+- ✅ Login con Firebase Auth (email/password)
+- ✅ Registro de nuevos pacientes
+- ✅ Gestión de sesión persistente
+- ✅ Recuperación de contraseña
+- ✅ AuthProvider con Provider pattern
+- ✅ Navegación con go_router
 
-### Fase 2: Gestión Médica
-- [ ] Gestión de Consultas (CRUD completo)
-- [ ] Prescripción de Recetas
-- [ ] Solicitud de Exámenes de Laboratorio
-- [ ] Registro de Hospitalizaciones
-- [ ] Vista detallada de historial médico por paciente
+### 🔜 Fase 2: Información Personal
+- [ ] Ver perfil completo del paciente
+- [ ] Editar información personal
+- [ ] Actualizar foto de perfil
+- [ ] Agregar contacto de emergencia
 
-### Fase 3: Funcionalidades Avanzadas
-- [ ] Dashboard con estadísticas del médico
-- [ ] Búsqueda avanzada de pacientes
-- [ ] Filtros por hospital activo
-- [ ] Notificaciones push para alertas médicas
-- [ ] Modo offline con sincronización
-- [ ] Exportar reportes médicos (PDF)
-- [ ] Firma digital de documentos médicos
+### 🔜 Fase 3: Ficha Médica
+- [ ] Ver ficha médica completa
+- [ ] Ver historial de consultas
+- [ ] Ver diagnósticos y tratamientos
+- [ ] Agregar alergias y antecedentes
+
+### 🔜 Fase 4: Documentos Médicos
+- [ ] Subir documentos (cámara/galería)
+- [ ] Subir PDFs
+- [ ] Categorizar documentos
+- [ ] Compartir con médicos
+- [ ] Eliminar documentos
+
+### 🔜 Fase 5: Citas Médicas
+- [ ] Agendar nueva cita
+- [ ] Ver citas programadas
+- [ ] Cancelar/reprogramar citas
+- [ ] Notificaciones de recordatorio
+- [ ] Ver ubicación del hospital
+
+### 🔜 Fase 6: Recetas Médicas
+- [ ] Ver recetas activas
+- [ ] Ver historial de recetas
+- [ ] Información de medicamentos
+- [ ] Descargar recetas (PDF)
 
 ## 🔐 Flujo de Autenticación
 
-### 1. Login
+### 1. Registro de Nuevo Paciente
+```dart
+// Usuario completa formulario de registro
+final userCredential = await FirebaseAuth.instance
+    .createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+// Se crea documento en Firestore (colección pacientes)
+await FirebaseFirestore.instance
+    .collection('pacientes')
+    .doc(userCredential.user!.uid)
+    .set({
+      'email': email,
+      'nombre': nombre,
+      'apellido': apellido,
+      'rut': rut,
+      'telefono': telefono,
+      'activo': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+```
+
+### 2. Login
 ```dart
 // Usuario ingresa email/password
 final userCredential = await FirebaseAuth.instance
     .signInWithEmailAndPassword(email: email, password: password);
 
-// Se obtienen los datos del usuario desde Firestore
-final userDoc = await FirebaseFirestore.instance
-    .collection('usuarios')
+// Se obtienen los datos del paciente desde Firestore
+final pacienteDoc = await FirebaseFirestore.instance
+    .collection('pacientes')
     .doc(userCredential.user!.uid)
     .get();
 
-// Se verifican custom claims
-final idTokenResult = await userCredential.user!.getIdTokenResult();
-final rol = idTokenResult.claims?['rol'];
-final hospitalesAsignados = idTokenResult.claims?['hospitalesAsignados'];
-
-// Solo médicos pueden acceder a Flutter
-if (rol != 'medico') {
-  throw Exception('Acceso denegado: Solo personal médico');
-}
-```
-
-### 2. Selector de Hospital (si tiene múltiples)
-```dart
-// Si hospitalesAsignados.length > 1
-// Mostrar pantalla de selección
-HospitalSelectorPage(hospitales: hospitalesAsignados);
-
-// Guardar hospital activo en estado de la app
-Provider.of<AuthProvider>(context, listen: false)
-    .setActiveHospital(selectedHospital);
-```
-
-### 3. Verificación de Permisos
-```dart
-// Antes de crear una consulta
-final hasPermission = await PermisosService.verificarPermiso(
-  hospitalId: activeHospital,
-  permiso: 'crear_consultas'
-);
-
-if (!hasPermission) {
-  showDialog(/* No tienes permiso */);
-  return;
+// Verificar que esté activo
+if (!pacienteDoc.data()?['activo']) {
+  throw Exception('Usuario inactivo');
 }
 
-// Proceder con la acción
-await ConsultasService.crearConsulta(data);
+// Actualizar último acceso
+await pacienteDoc.reference.update({
+  'ultimoAcceso': FieldValue.serverTimestamp(),
+});
 ```
 
-### 4. Filtrado Automático
+### 3. Sesión Persistente
 ```dart
-// Todas las queries se filtran por hospitales asignados
-Query<Map<String, dynamic>> getPacientesQuery() {
-  final hospitales = currentUser.hospitalesAsignados;
+// Al iniciar la app, verificar si hay sesión activa
+final currentUser = FirebaseAuth.instance.currentUser;
+
+if (currentUser != null) {
+  // Cargar datos del paciente
+  final paciente = await getPacienteData(currentUser.uid);
   
-  return FirebaseFirestore.instance
-      .collection('pacientes')
-      .where('hospitalesAtendido', arrayContainsAny: hospitales);
+  // Actualizar estado de la app
+  authProvider.setCurrentUser(paciente);
 }
+```
+
+### 4. Recuperación de Contraseña
+```dart
+// Enviar email de recuperación
+await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+// Firebase envía email automáticamente con link de reset
 ```
 
 ## 📝 Notas de Desarrollo

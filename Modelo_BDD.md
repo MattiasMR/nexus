@@ -227,7 +227,6 @@ Sistema médico multi-tenant con autenticación unificada para pacientes (Ionic)
 |-------|------|-----------|-------------|
 | `id` | string | Auto | ID del documento |
 | `idUsuario` | string | ❌ | Ref a usuarios (si tiene cuenta) |
-| `hospitalesAsignados` | string[] | ❌ | IDs de hospitales donde trabaja |
 | `rut` | string | ✅ | RUT único del profesional |
 | `nombre` | string | ✅ | Nombre del profesional |
 | `apellido` | string | ✅ | Apellido del profesional |
@@ -242,7 +241,8 @@ Sistema médico multi-tenant con autenticación unificada para pacientes (Ionic)
 **Índices**:
 - `rut` (único)
 - `especialidad` (filtrado)
-- `hospitalesAsignados` (array-contains)
+
+**Nota**: Los hospitales asignados se encuentran en la colección `usuarios`, no en `profesionales`.
 
 ---
 

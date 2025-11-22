@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
 import '../../../models/paciente.dart';
 import '../../../models/medicamento.dart';
 import '../../../services/recetas_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../providers/auth_provider.dart';
 
 class NuevaRecetaPage extends StatefulWidget {
   static const routeName = '/nueva-receta';
@@ -19,7 +20,6 @@ class NuevaRecetaPage extends StatefulWidget {
 
 class _NuevaRecetaPageState extends State<NuevaRecetaPage> {
   final _recetasService = RecetasService();
-  final _authService = AuthService();
   
   final _indicacionesController = TextEditingController();
   final List<MedicamentoRecetado> _medicamentosRecetados = [];
@@ -269,12 +269,18 @@ class _NuevaRecetaPageState extends State<NuevaRecetaPage> {
     }
 
     // Verificar permisos
-    if (_authService.puedeRecetarMedicamentos == false) {
-      _authService.mostrarPermisosDenegados(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.puedeRecetarMedicamentos()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No tienes permisos para prescribir medicamentos (Rol: ${authProvider.currentUser?.rolTexto})'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
-    final usuarioActual = _authService.usuarioActual;
+    final usuarioActual = authProvider.currentUser;
     if (usuarioActual == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -364,7 +370,7 @@ class _MedicamentoDialogState extends State<_MedicamentoDialog> {
             const Text('Medicamento', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<Medicamento>(
-              value: _medicamentoSeleccionado,
+              initialValue: _medicamentoSeleccionado,
               items: widget.catalogoMedicamentos.map((med) {
                 return DropdownMenuItem(
                   value: med,

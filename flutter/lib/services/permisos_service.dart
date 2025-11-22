@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// Servicio para verificar permisos granulares de usuarios
 class PermisosService {
@@ -35,7 +36,7 @@ class PermisosService {
       // Verificar si tiene el permiso
       return permisos.contains(permiso);
     } catch (e) {
-      print('Error al verificar permiso: $e');
+      debugPrint('Error al verificar permiso: $e');
       return false;
     }
   }
@@ -79,7 +80,7 @@ class PermisosService {
       final data = permisoDoc.docs.first.data();
       return List<String>.from(data['permisos'] ?? []);
     } catch (e) {
-      print('Error al obtener permisos: $e');
+      debugPrint('Error al obtener permisos: $e');
       return [];
     }
   }
@@ -95,7 +96,7 @@ class PermisosService {
       final rol = userDoc.data()?['rol'];
       return rol == 'super_admin';
     } catch (e) {
-      print('Error al verificar acceso total: $e');
+      debugPrint('Error al verificar acceso total: $e');
       return false;
     }
   }

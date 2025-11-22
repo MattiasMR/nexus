@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
 import '../../../models/paciente.dart';
 import '../../../models/examen.dart';
 import '../../../services/examenes_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../providers/auth_provider.dart';
 
 class NuevaOrdenExamenPage extends StatefulWidget {
   static const routeName = '/nueva-orden-examen';
@@ -18,7 +19,6 @@ class NuevaOrdenExamenPage extends StatefulWidget {
 
 class _NuevaOrdenExamenPageState extends State<NuevaOrdenExamenPage> {
   final _examenesService = ExamenesService();
-  final _authService = AuthService();
   
   final _motivoController = TextEditingController();
   final _indicacionesController = TextEditingController();
@@ -310,12 +310,18 @@ class _NuevaOrdenExamenPageState extends State<NuevaOrdenExamenPage> {
     }
 
     // Verificar permisos
-    if (_authService.puedeRegistrarConsultas == false) {
-      _authService.mostrarPermisosDenegados(context);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.puedeOrdenarExamenes()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No tienes permisos para ordenar exámenes (Rol: ${authProvider.currentUser?.rolTexto})'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
-    final usuarioActual = _authService.usuarioActual;
+    final usuarioActual = authProvider.currentUser;
     if (usuarioActual == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -401,7 +407,7 @@ class _ExamenDialogState extends State<_ExamenDialog> {
             const Text('Examen', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             DropdownButtonFormField<Examen>(
-              value: _examenSeleccionado,
+              initialValue: _examenSeleccionado,
               items: widget.catalogoExamenes.map((examen) {
                 return DropdownMenuItem(
                   value: examen,

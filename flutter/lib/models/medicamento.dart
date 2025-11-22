@@ -99,6 +99,9 @@ class Receta {
   final DateTime fecha;
   final List<MedicamentoRecetado> medicamentos;
   final String? observaciones;
+  final bool vigente; // Estado de la receta
+  final String? nombreProfesional; // Nombre del médico
+  final String? especialidadProfesional; // Especialidad del médico
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -110,23 +113,41 @@ class Receta {
     required this.fecha,
     required this.medicamentos,
     this.observaciones,
+    this.vigente = true,
+    this.nombreProfesional,
+    this.especialidadProfesional,
     this.createdAt,
     this.updatedAt,
   });
 
   factory Receta.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    // Soportar tanto 'fecha' como 'fechaEmision'
+    final fechaData = data['fechaEmision'] ?? data['fecha'];
+    
+    // Soportar tanto 'vigente' (bool) como 'estado' (string)
+    bool isVigente = true;
+    if (data['vigente'] != null) {
+      isVigente = data['vigente'] as bool;
+    } else if (data['estado'] != null) {
+      isVigente = data['estado'] == 'activa';
+    }
+    
     return Receta(
       id: doc.id,
       idPaciente: data['idPaciente'] ?? '',
       idProfesional: data['idProfesional'] ?? '',
       idConsulta: data['idConsulta'],
-      fecha: (data['fecha'] as Timestamp).toDate(),
+      fecha: (fechaData as Timestamp).toDate(),
       medicamentos: (data['medicamentos'] as List<dynamic>?)
               ?.map((m) => MedicamentoRecetado.fromMap(m as Map<String, dynamic>))
               .toList() ??
           [],
-      observaciones: data['observaciones'],
+      observaciones: data['observaciones'] ?? data['indicaciones'],
+      vigente: isVigente,
+      nombreProfesional: data['nombreProfesional'] ?? data['nombreMedico'],
+      especialidadProfesional: data['especialidadProfesional'] ?? data['especialidadMedico'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
@@ -140,6 +161,9 @@ class Receta {
       'fecha': Timestamp.fromDate(fecha),
       'medicamentos': medicamentos.map((m) => m.toMap()).toList(),
       if (observaciones != null) 'observaciones': observaciones,
+      'vigente': vigente,
+      if (nombreProfesional != null) 'nombreProfesional': nombreProfesional,
+      if (especialidadProfesional != null) 'especialidadProfesional': especialidadProfesional,
       'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
       'updatedAt': Timestamp.fromDate(updatedAt ?? DateTime.now()),
     };

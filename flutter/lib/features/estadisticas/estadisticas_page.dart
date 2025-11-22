@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../shared/widgets/weather_widget.dart';
 
@@ -12,9 +13,9 @@ class EstadisticasPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
+    final authProvider = Provider.of<AuthProvider>(context);
     
-    if (!authService.puedeVerEstadisticas()) {
+    if (!authProvider.puedeVerEstadisticas()) {
       return Scaffold(
         appBar: AppBar(title: const Text('Acceso Denegado')),
         body: Center(

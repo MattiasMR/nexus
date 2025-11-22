@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../../models/paciente.dart';
 import '../../../models/ficha_medica.dart';
 import '../../../models/consulta.dart';
 import '../../../services/consultas_service.dart';
 import '../../../services/fichas_medicas_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../utils/app_colors.dart';
 import '../../../utils/validators.dart';
 import 'package:intl/intl.dart';
@@ -33,7 +34,6 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
   
   final _consultasService = ConsultasService();
   final _fichasService = FichasMedicasService();
-  final _authService = AuthService();
 
   // Controladores de formulario
   final _motivoController = TextEditingController();
@@ -670,7 +670,8 @@ class _NuevaAtencionPageState extends State<NuevaAtencionPage> {
       }
 
       // Obtener usuario actual
-      final usuarioActual = _authService.usuarioActual;
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final usuarioActual = authProvider.currentUser;
       if (usuarioActual == null) {
         throw Exception('No hay un usuario autenticado');
       }

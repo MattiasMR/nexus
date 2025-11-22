@@ -51,7 +51,7 @@ class AppColors {
   static List<BoxShadow> get elevation1 => [
         BoxShadow(
           // ignore: deprecated_member_use
-          color: const Color(0xFF174296).withOpacity(0.08),
+          color: const Color(0xFF174296).withValues(alpha: 0.08),
           blurRadius: 12,
           offset: const Offset(0, 4),
         ),
@@ -60,7 +60,7 @@ class AppColors {
   static List<BoxShadow> get elevation2 => [
         BoxShadow(
           // ignore: deprecated_member_use
-          color: const Color(0xFF174296).withOpacity(0.12),
+          color: const Color(0xFF174296).withValues(alpha: 0.12),
           blurRadius: 24,
           offset: const Offset(0, 10),
         ),
@@ -69,7 +69,7 @@ class AppColors {
   static List<BoxShadow> get buttonShadow => [
         BoxShadow(
           // ignore: deprecated_member_use
-          color: const Color(0xFF1F88FF).withOpacity(0.18),
+          color: const Color(0xFF1F88FF).withValues(alpha: 0.18),
           blurRadius: 16,
           offset: const Offset(0, 8),
         ),

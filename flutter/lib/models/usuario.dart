@@ -1,78 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Roles de usuario en el sistema
-enum RolUsuario {
-  paciente,
-  medico,
-  enfermera,
-  admin,
-  superAdmin;
-
-  /// Convertir desde string
-  static RolUsuario fromString(String rol) {
-    switch (rol.toLowerCase()) {
-      case 'paciente':
-        return RolUsuario.paciente;
-      case 'medico':
-        return RolUsuario.medico;
-      case 'enfermera':
-        return RolUsuario.enfermera;
-      case 'admin':
-        return RolUsuario.admin;
-      case 'super_admin':
-        return RolUsuario.superAdmin;
-      default:
-        return RolUsuario.paciente;
-    }
-  }
-
-  /// Convertir a string para Firestore
-  String toFirestore() {
-    switch (this) {
-      case RolUsuario.paciente:
-        return 'paciente';
-      case RolUsuario.medico:
-        return 'medico';
-      case RolUsuario.enfermera:
-        return 'enfermera';
-      case RolUsuario.admin:
-        return 'admin';
-      case RolUsuario.superAdmin:
-        return 'super_admin';
-    }
-  }
-
-  /// Obtener texto legible
-  String get displayName {
-    switch (this) {
-      case RolUsuario.paciente:
-        return 'Paciente';
-      case RolUsuario.medico:
-        return 'Médico';
-      case RolUsuario.enfermera:
-        return 'Enfermera';
-      case RolUsuario.admin:
-        return 'Administrador';
-      case RolUsuario.superAdmin:
-        return 'Super Administrador';
-    }
-  }
-}
-
-/// Modelo de Usuario del sistema
-/// Representa un usuario autenticado con rol y permisos
+/// Modelo de Usuario del sistema (PACIENTES)
+/// Esta app de Flutter es exclusivamente para pacientes
+/// Los médicos usan la app Ionic
 class Usuario {
   final String id; // Firebase Auth UID
   final String email;
-  final String displayName;
-  final RolUsuario rol;
+  final String nombre;
+  final String apellido;
+  final String rut;
+  final String telefono;
   final bool activo;
   final String? photoURL;
-  final String? telefono;
-  final String? idPaciente; // Si rol = 'paciente'
-  final String? idProfesional; // Si rol = 'medico', 'enfermera'
-  final List<String> hospitalesAsignados; // Para médicos/admins
-  final List<String> especialidades; // Solo para médicos
+  final String? direccion;
+  final String? fechaNacimiento; // Formato: YYYY-MM-DD
+  final String? sexo; // M, F, Otro
+  final String? prevision; // Isapre, Fonasa, etc.
+  final String? contactoEmergencia;
+  final String? telefonoEmergencia;
   final DateTime? ultimoAcceso;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -80,15 +25,18 @@ class Usuario {
   Usuario({
     required this.id,
     required this.email,
-    required this.displayName,
-    required this.rol,
-    required this.activo,
+    required this.nombre,
+    required this.apellido,
+    required this.rut,
+    required this.telefono,
+    this.activo = true,
     this.photoURL,
-    this.telefono,
-    this.idPaciente,
-    this.idProfesional,
-    this.hospitalesAsignados = const [],
-    this.especialidades = const [],
+    this.direccion,
+    this.fechaNacimiento,
+    this.sexo,
+    this.prevision,
+    this.contactoEmergencia,
+    this.telefonoEmergencia,
     this.ultimoAcceso,
     required this.createdAt,
     required this.updatedAt,
@@ -102,18 +50,32 @@ class Usuario {
 
   /// Crear Usuario desde Map
   factory Usuario.fromMap(Map<String, dynamic> map, String id) {
+    // Helper para convertir fechaNacimiento (puede ser String o Timestamp)
+    String? parseFechaNacimiento(dynamic value) {
+      if (value == null) return null;
+      if (value is String) return value;
+      if (value is Timestamp) {
+        final date = value.toDate();
+        return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      }
+      return null;
+    }
+
     return Usuario(
       id: id,
       email: map['email'] ?? '',
-      displayName: map['displayName'] ?? '',
-      rol: RolUsuario.fromString(map['rol'] ?? 'paciente'),
+      nombre: map['nombre'] ?? '',
+      apellido: map['apellido'] ?? '',
+      rut: map['rut'] ?? '',
+      telefono: map['telefono'] ?? '',
       activo: map['activo'] ?? true,
       photoURL: map['photoURL'],
-      telefono: map['telefono'],
-      idPaciente: map['idPaciente'],
-      idProfesional: map['idProfesional'],
-      hospitalesAsignados: List<String>.from(map['hospitalesAsignados'] ?? []),
-      especialidades: List<String>.from(map['especialidades'] ?? []),
+      direccion: map['direccion'],
+      fechaNacimiento: parseFechaNacimiento(map['fechaNacimiento']),
+      sexo: map['sexo'],
+      prevision: map['prevision'],
+      contactoEmergencia: map['contactoEmergencia'],
+      telefonoEmergencia: map['telefonoEmergencia'],
       ultimoAcceso: map['ultimoAcceso'] != null
           ? (map['ultimoAcceso'] as Timestamp).toDate()
           : null,
@@ -126,15 +88,18 @@ class Usuario {
   Map<String, dynamic> toMap() {
     return {
       'email': email,
-      'displayName': displayName,
-      'rol': rol.toFirestore(),
+      'nombre': nombre,
+      'apellido': apellido,
+      'rut': rut,
+      'telefono': telefono,
       'activo': activo,
       'photoURL': photoURL,
-      'telefono': telefono,
-      'idPaciente': idPaciente,
-      'idProfesional': idProfesional,
-      'hospitalesAsignados': hospitalesAsignados,
-      'especialidades': especialidades,
+      'direccion': direccion,
+      'fechaNacimiento': fechaNacimiento,
+      'sexo': sexo,
+      'prevision': prevision,
+      'contactoEmergencia': contactoEmergencia,
+      'telefonoEmergencia': telefonoEmergencia,
       'ultimoAcceso':
           ultimoAcceso != null ? Timestamp.fromDate(ultimoAcceso!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -142,56 +107,52 @@ class Usuario {
     };
   }
 
-  // ========== PROPIEDADES DE VERIFICACIÓN ==========
-
-  /// Verificar si el usuario es personal médico (puede usar Flutter app)
-  bool get esPersonalMedico =>
-      rol == RolUsuario.medico ||
-      rol == RolUsuario.enfermera ||
-      rol == RolUsuario.admin;
-
-  /// Verificar si es médico
-  bool get esMedico => rol == RolUsuario.medico;
-
-  /// Verificar si es enfermera
-  bool get esEnfermera => rol == RolUsuario.enfermera;
-
-  /// Verificar si es administrador
-  bool get esAdmin => rol == RolUsuario.admin || rol == RolUsuario.superAdmin;
-
-  /// Verificar si tiene múltiples hospitales asignados
-  bool get tieneMultiplesHospitales => hospitalesAsignados.length > 1;
+  // ========== PROPIEDADES ==========
 
   /// Obtener nombre completo
-  String get nombreCompleto => displayName;
+  String get nombreCompleto => '$nombre $apellido';
+  
+  /// Alias para compatibilidad (displayName)
+  String get displayName => nombreCompleto;
+  
+  /// Rol del usuario (siempre Paciente en esta app)
+  String get rolTexto => 'Paciente';
 
-  /// Obtener rol como texto
-  String get rolTexto => rol.displayName;
+  /// Verificar si tiene foto de perfil
+  bool get tieneFoto => photoURL != null && photoURL!.isNotEmpty;
 
-  // ========== PERMISOS ==========
-
-  /// Permisos según rol
-  bool get puedeRegistrarConsultas => esMedico || esEnfermera;
-  bool get puedeEditarPacientes => esMedico || esAdmin;
-  bool get puedeEliminarPacientes => esAdmin;
-  bool get puedeVerEstadisticas => esMedico || esAdmin;
-  bool get puedeGestionarUsuarios => esAdmin;
-  bool get puedeRecetarMedicamentos => esMedico;
-  bool get puedeOrdenarExamenes => esMedico;
-  bool get puedeRegistrarHospitalizaciones => esMedico;
+  /// Obtener edad (si tiene fecha de nacimiento)
+  int? get edad {
+    if (fechaNacimiento == null) return null;
+    try {
+      final birth = DateTime.parse(fechaNacimiento!);
+      final today = DateTime.now();
+      int age = today.year - birth.year;
+      if (today.month < birth.month ||
+          (today.month == birth.month && today.day < birth.day)) {
+        age--;
+      }
+      return age;
+    } catch (e) {
+      return null;
+    }
+  }
 
   /// Copiar con modificaciones
   Usuario copyWith({
     String? email,
-    String? displayName,
-    RolUsuario? rol,
+    String? nombre,
+    String? apellido,
+    String? rut,
+    String? telefono,
     bool? activo,
     String? photoURL,
-    String? telefono,
-    String? idPaciente,
-    String? idProfesional,
-    List<String>? hospitalesAsignados,
-    List<String>? especialidades,
+    String? direccion,
+    String? fechaNacimiento,
+    String? sexo,
+    String? prevision,
+    String? contactoEmergencia,
+    String? telefonoEmergencia,
     DateTime? ultimoAcceso,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -199,15 +160,18 @@ class Usuario {
     return Usuario(
       id: id,
       email: email ?? this.email,
-      displayName: displayName ?? this.displayName,
-      rol: rol ?? this.rol,
+      nombre: nombre ?? this.nombre,
+      apellido: apellido ?? this.apellido,
+      rut: rut ?? this.rut,
+      telefono: telefono ?? this.telefono,
       activo: activo ?? this.activo,
       photoURL: photoURL ?? this.photoURL,
-      telefono: telefono ?? this.telefono,
-      idPaciente: idPaciente ?? this.idPaciente,
-      idProfesional: idProfesional ?? this.idProfesional,
-      hospitalesAsignados: hospitalesAsignados ?? this.hospitalesAsignados,
-      especialidades: especialidades ?? this.especialidades,
+      direccion: direccion ?? this.direccion,
+      fechaNacimiento: fechaNacimiento ?? this.fechaNacimiento,
+      sexo: sexo ?? this.sexo,
+      prevision: prevision ?? this.prevision,
+      contactoEmergencia: contactoEmergencia ?? this.contactoEmergencia,
+      telefonoEmergencia: telefonoEmergencia ?? this.telefonoEmergencia,
       ultimoAcceso: ultimoAcceso ?? this.ultimoAcceso,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -216,7 +180,7 @@ class Usuario {
 
   @override
   String toString() {
-    return 'Usuario(id: $id, email: $email, displayName: $displayName, rol: ${rol.displayName})';
+    return 'Usuario(id: $id, email: $email, nombreCompleto: $nombreCompleto, rut: $rut)';
   }
 }
 

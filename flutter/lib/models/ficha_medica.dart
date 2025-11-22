@@ -6,6 +6,8 @@ class FichaMedica {
   final String idPaciente;
   final DateTime fechaMedica;
   final String? observacion;
+  final String? grupoSanguineo;
+  final List<String> alergias;
   final Antecedentes? antecedentes;
   final int? totalConsultas;
   final DateTime? ultimaConsulta;
@@ -17,6 +19,8 @@ class FichaMedica {
     required this.idPaciente,
     required this.fechaMedica,
     this.observacion,
+    this.grupoSanguineo,
+    this.alergias = const [],
     this.antecedentes,
     this.totalConsultas,
     this.ultimaConsulta,
@@ -30,6 +34,8 @@ class FichaMedica {
       'idPaciente': idPaciente,
       'fechaMedica': Timestamp.fromDate(fechaMedica),
       if (observacion != null) 'observacion': observacion,
+      if (grupoSanguineo != null) 'grupoSanguineo': grupoSanguineo,
+      'alergias': alergias,
       if (antecedentes != null) 'antecedentes': antecedentes!.toMap(),
       if (totalConsultas != null) 'totalConsultas': totalConsultas,
       if (ultimaConsulta != null) 'ultimaConsulta': Timestamp.fromDate(ultimaConsulta!),
@@ -44,8 +50,12 @@ class FichaMedica {
     return FichaMedica(
       id: doc.id,
       idPaciente: data['idPaciente'] ?? '',
-      fechaMedica: (data['fechaMedica'] as Timestamp).toDate(),
+      fechaMedica: data['fechaMedica'] != null 
+          ? (data['fechaMedica'] as Timestamp).toDate()
+          : DateTime.now(),
       observacion: data['observacion'],
+      grupoSanguineo: data['grupoSanguineo'],
+      alergias: data['alergias'] != null ? List<String>.from(data['alergias']) : [],
       antecedentes: data['antecedentes'] != null
           ? Antecedentes.fromMap(data['antecedentes'] as Map<String, dynamic>)
           : null,
@@ -64,6 +74,8 @@ class FichaMedica {
     String? idPaciente,
     DateTime? fechaMedica,
     String? observacion,
+    String? grupoSanguineo,
+    List<String>? alergias,
     Antecedentes? antecedentes,
     int? totalConsultas,
     DateTime? ultimaConsulta,
@@ -75,6 +87,8 @@ class FichaMedica {
       idPaciente: idPaciente ?? this.idPaciente,
       fechaMedica: fechaMedica ?? this.fechaMedica,
       observacion: observacion ?? this.observacion,
+      grupoSanguineo: grupoSanguineo ?? this.grupoSanguineo,
+      alergias: alergias ?? this.alergias,
       antecedentes: antecedentes ?? this.antecedentes,
       totalConsultas: totalConsultas ?? this.totalConsultas,
       ultimaConsulta: ultimaConsulta ?? this.ultimaConsulta,
@@ -90,15 +104,19 @@ class Antecedentes {
   final String? personales;
   final String? quirurgicos;
   final String? hospitalizaciones;
-  final List<String>? alergias;
 
   Antecedentes({
     this.familiares,
     this.personales,
     this.quirurgicos,
     this.hospitalizaciones,
-    this.alergias,
   });
+
+  bool get isEmpty =>
+      familiares == null &&
+      personales == null &&
+      quirurgicos == null &&
+      hospitalizaciones == null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -106,7 +124,6 @@ class Antecedentes {
       if (personales != null) 'personales': personales,
       if (quirurgicos != null) 'quirurgicos': quirurgicos,
       if (hospitalizaciones != null) 'hospitalizaciones': hospitalizaciones,
-      if (alergias != null) 'alergias': alergias,
     };
   }
 
@@ -116,7 +133,6 @@ class Antecedentes {
       personales: map['personales'],
       quirurgicos: map['quirurgicos'],
       hospitalizaciones: map['hospitalizaciones'],
-      alergias: map['alergias'] != null ? List<String>.from(map['alergias']) : null,
     );
   }
 }

@@ -438,6 +438,50 @@ async function seedFirestore() {
     }
     console.log(`   ✓ ${recetasCreadas} recetas creadas`);
 
+    // 8. CREAR DOCUMENTOS MÉDICOS (2-4 por paciente)
+    console.log('\n📄 Creando documentos médicos...');
+    const tiposDocumento = ['examen', 'imagen', 'informe', 'otro'];
+    const nombresDocumento = {
+      'examen': ['Hemograma Completo', 'Examen de Orina', 'Perfil Lipídico', 'Glicemia'],
+      'imagen': ['Radiografía Tórax', 'Ecografía Abdominal', 'TAC Cerebral', 'Resonancia Magnética'],
+      'informe': ['Informe Cardiológico', 'Informe Neurológico', 'Informe Oncológico'],
+      'otro': ['Certificado Médico', 'Orden de Reposo', 'Epicrisis']
+    };
+    
+    // URLs de documentos PDF públicos confiables para testing
+    const urlsEjemplo = [
+      'https://pdfobject.com/pdf/sample.pdf',
+      'https://www.orimi.com/pdf-test.pdf',
+      'https://file-examples.com/storage/fe28a82ba9eb1afe5d15e66/2017/10/file-sample_150kB.pdf',
+      'https://www.adobe.com/support/products/enterprise/knowledgecenter/media/c4611_sample_explain.pdf'
+    ];
+    
+    let documentosCreados = 0;
+    for (const pacienteId of createdIds.pacientes) {
+      const numDocumentos = Math.floor(Math.random() * 3) + 2; // 2-4 documentos
+      
+      for (let i = 0; i < numDocumentos; i++) {
+        const tipo = randomElement(tiposDocumento);
+        const nombre = randomElement(nombresDocumento[tipo]);
+        const url = randomElement(urlsEjemplo);
+        const tamanio = Math.floor(Math.random() * 2000000) + 50000; // 50KB - 2MB
+        
+        await db.collection('documentos').add({
+          idPaciente: pacienteId,
+          nombre: nombre,
+          tipo: tipo,
+          url: url,
+          tamanio: tamanio,
+          fecha: Timestamp.fromDate(daysAgo(Math.floor(Math.random() * 180))),
+          createdAt: now,
+          updatedAt: now
+        });
+        
+        documentosCreados++;
+      }
+    }
+    console.log(`   ✓ ${documentosCreados} documentos médicos creados`);
+
     // RESUMEN FINAL
     console.log('\n╔════════════════════════════════════════════════╗');
     console.log('║   ✅ BASE DE DATOS INICIALIZADA               ║');
@@ -451,6 +495,7 @@ async function seedFirestore() {
     console.log(`   • ${createdIds.consultas.length} consultas`);
     console.log(`   • ${ordenesCreadas} órdenes de exámenes`);
     console.log(`   • ${recetasCreadas} recetas`);
+    console.log(`   • ${documentosCreados} documentos médicos`);
     console.log('\n🚀 ¡Tu aplicación está lista para usar!');
 
   } catch (error) {

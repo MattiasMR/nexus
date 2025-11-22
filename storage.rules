@@ -1,0 +1,60 @@
+rules_version = '2';
+
+// Firebase Storage Rules para Nexus
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Función auxiliar para verificar autenticación
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Función para verificar que es el propietario
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Función para validar tamaño de archivo (max 10MB)
+    function isValidSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+    
+    // Función para validar tipos de archivo permitidos
+    function isValidFileType() {
+      return request.resource.contentType.matches('image/.*') ||
+             request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*');
+    }
+    
+    // Documentos de pacientes
+    match /documentos/{userId}/{fileName} {
+      // Lectura: solo el propietario autenticado
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Escritura: solo el propietario autenticado, con validaciones
+      allow write: if isAuthenticated() && 
+                     isOwner(userId) && 
+                     isValidSize() && 
+                     isValidFileType();
+      
+      // Eliminación: solo el propietario
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Fotos de perfil
+    match /profile-photos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && 
+                     isOwner(userId) && 
+                     request.resource.size < 5 * 1024 * 1024 &&
+                     request.resource.contentType.matches('image/.*');
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Denegar todo lo demás
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

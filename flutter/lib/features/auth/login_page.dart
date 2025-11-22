@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 
-/// Pantalla de inicio de sesión
+/// Pantalla de inicio de sesión (PACIENTES)
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -39,6 +40,8 @@ class _LoginPageState extends State<LoginPage> {
     final savedEmail = await authProvider.authService.getLastEmail();
     final rememberMe = await authProvider.authService.getRememberMe();
     
+    if (!mounted) return;
+    
     if (savedEmail != null && rememberMe) {
       setState(() {
         _emailController.text = savedEmail;
@@ -51,7 +54,10 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
+
+    debugPrint('🔐 Intentando login con: ${_emailController.text.trim()}');
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.signIn(
@@ -60,20 +66,31 @@ class _LoginPageState extends State<LoginPage> {
       rememberMe: _rememberMe,
     );
 
+    debugPrint('🔐 Resultado del login: ${success ? 'ÉXITO' : 'FALLO'}');
+    debugPrint('🔐 Estado de auth: ${authProvider.status}');
+    if (authProvider.currentUser != null) {
+      debugPrint('✅ Usuario autenticado: ${authProvider.currentUser!.nombreCompleto}');
+    }
+
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     if (!mounted) return;
 
     if (!success) {
       // Mostrar error
+      debugPrint('❌ Error de login: ${authProvider.errorMessage}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage ?? 'Error al iniciar sesión'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
         ),
       );
       authProvider.clearError();
+    } else {
+      debugPrint('✅ Login exitoso, navegando...');
     }
     // Si es exitoso, la navegación se maneja en main.dart con go_router
   }
@@ -81,7 +98,7 @@ class _LoginPageState extends State<LoginPage> {
   /// Recuperar contraseña
   Future<void> _handleForgotPassword() async {
     final email = _emailController.text.trim();
-    
+
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -96,10 +113,9 @@ class _LoginPageState extends State<LoginPage> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final success = await authProvider.sendPasswordResetEmail(email);
+    if (!mounted) return;
 
     setState(() => _isLoading = false);
-
-    if (!mounted) return;
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -124,22 +140,49 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primary,
-              AppColors.primaryLight,
-            ],
+      body: Stack(
+        children: [
+          _buildGradientBackground(),
+          _buildLoadingOverlay(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradientBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.primary,
+            AppColors.primaryLight,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: _buildLoginCard(),
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: _buildLoginCard(),
+      ),
+    );
+  }
+
+  Widget _buildLoadingOverlay() {
+    return IgnorePointer(
+      ignoring: !_isLoading,
+      child: AnimatedOpacity(
+        opacity: _isLoading ? 1 : 0,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.45),
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
           ),
         ),
@@ -183,6 +226,25 @@ class _LoginPageState extends State<LoginPage> {
               
               // Forgot password
               _buildForgotPasswordButton(),
+              const SizedBox(height: 8),
+              
+              // Divider
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('o'),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+              ),
+              
+              // Register button
+              _buildRegisterButton(),
             ],
           ),
         ),
@@ -193,15 +255,15 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildHeader() {
     return Column(
       children: [
-        // Icono de hospital/médico
+        // Icono de paciente
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
-            Icons.local_hospital_rounded,
+            Icons.person_rounded,
             size: 64,
             color: AppColors.primary,
           ),
@@ -216,7 +278,7 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Personal Médico',
+          'Portal del Paciente',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -233,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
       enabled: !_isLoading,
       decoration: InputDecoration(
         labelText: 'Correo Electrónico',
-        hintText: 'ejemplo@hospital.com',
+        hintText: 'ejemplo@email.com',
         prefixIcon: const Icon(Icons.email_outlined),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -321,22 +383,27 @@ class _LoginPageState extends State<LoginPage> {
           ),
           elevation: 2,
         ),
-        child: _isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: _isLoading
+              ? const SizedBox(
+                  key: ValueKey('loading'),
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  'Iniciar Sesión',
+                  key: ValueKey('text'),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              )
-            : const Text(
-                'Iniciar Sesión',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+        ),
       ),
     );
   }
@@ -349,6 +416,31 @@ class _LoginPageState extends State<LoginPage> {
         style: TextStyle(
           color: AppColors.primary,
           fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRegisterButton() {
+    return OutlinedButton(
+      onPressed: _isLoading
+          ? null
+          : () {
+              context.go('/register');
+            },
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        side: BorderSide(color: AppColors.primary, width: 2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: Text(
+        'Crear Nueva Cuenta',
+        style: TextStyle(
+          color: AppColors.primary,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

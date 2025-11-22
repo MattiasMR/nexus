@@ -1,0 +1,176 @@
+// ============================================
+// REGLAS DE SEGURIDAD FIRESTORE
+// Para App Flutter - Pacientes
+// ============================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // FUNCIONES AUXILIARES
+    // ============================================
+    
+    // Verificar si el usuario está autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Verificar si el usuario es el dueño del documento
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Verificar si el documento pertenece al usuario autenticado
+    function isDocumentOwner() {
+      return isAuthenticated() && resource.data.idPaciente == request.auth.uid;
+    }
+    
+    // ============================================
+    // COLECCIÓN: pacientes
+    // ============================================
+    
+    match /pacientes/{pacienteId} {
+      // Lectura: Solo el propio paciente puede ver sus datos
+      allow read: if isOwner(pacienteId);
+      
+      // Escritura: Solo el propio paciente puede modificar sus datos
+      // (excepto campos críticos que no deben cambiar)
+      allow update: if isOwner(pacienteId)
+        && request.resource.data.email == resource.data.email  // No puede cambiar email
+        && request.resource.data.rut == resource.data.rut      // No puede cambiar RUT
+        && request.resource.data.createdAt == resource.data.createdAt; // No puede cambiar fecha creación
+      
+      // Creación: Solo al registrarse (lo hace el AuthService)
+      allow create: if isAuthenticated() 
+        && request.auth.uid == pacienteId
+        && request.resource.data.email == request.auth.token.email;
+      
+      // Eliminación: No permitida (solo admins desde backend)
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: fichas-medicas
+    // ============================================
+    
+    match /fichas-medicas/{fichaId} {
+      // Lectura: Solo el paciente dueño de la ficha
+      allow read: if isDocumentOwner();
+      
+      // Escritura: Solo médicos pueden modificar (desde app Ionic)
+      // Los pacientes solo pueden leer
+      allow write: if false; // Pacientes no pueden modificar su ficha
+    }
+    
+    // ============================================
+    // COLECCIÓN: consultas
+    // ============================================
+    
+    match /consultas/{consultaId} {
+      // Lectura: Solo el paciente puede ver sus consultas
+      allow read: if isDocumentOwner();
+      
+      // Escritura: Solo médicos (desde app Ionic)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: documentos-paciente
+    // ============================================
+    
+    match /documentos-paciente/{documentoId} {
+      // Lectura: Solo el paciente dueño
+      allow read: if isDocumentOwner();
+      
+      // Creación: El paciente puede subir sus propios documentos
+      allow create: if isAuthenticated()
+        && request.resource.data.idPaciente == request.auth.uid;
+      
+      // Actualización: Puede actualizar nombre/descripción
+      allow update: if isDocumentOwner()
+        && request.resource.data.idPaciente == resource.data.idPaciente  // No puede cambiar dueño
+        && request.resource.data.url == resource.data.url;                // No puede cambiar URL
+      
+      // Eliminación: Puede eliminar sus propios documentos
+      allow delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // COLECCIÓN: recetas
+    // ============================================
+    
+    match /recetas/{recetaId} {
+      // Lectura: Solo el paciente puede ver sus recetas
+      allow read: if isDocumentOwner();
+      
+      // Escritura: Solo médicos (desde app Ionic)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIÓN: citas
+    // ============================================
+    
+    match /citas/{citaId} {
+      // Lectura: Solo el paciente puede ver sus citas
+      allow read: if isDocumentOwner();
+      
+      // Creación: El paciente puede agendar citas
+      allow create: if isAuthenticated()
+        && request.resource.data.idPaciente == request.auth.uid;
+      
+      // Actualización: Puede cancelar/reprogramar sus citas
+      allow update: if isDocumentOwner()
+        && request.resource.data.idPaciente == resource.data.idPaciente;
+      
+      // Eliminación: Puede eliminar (cancelar) sus citas
+      allow delete: if isDocumentOwner();
+    }
+    
+    // ============================================
+    // COLECCIÓN: ordenes-examen
+    // ============================================
+    
+    match /ordenes-examen/{ordenId} {
+      // Lectura: Solo el paciente puede ver sus órdenes
+      allow read: if isDocumentOwner();
+      
+      // Escritura: Solo médicos (desde app Ionic)
+      allow write: if false;
+    }
+    
+    // ============================================
+    // COLECCIONES DE CATÁLOGOS (Solo lectura)
+    // ============================================
+    
+    match /medicamentos/{medicamentoId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo admins desde backend
+    }
+    
+    match /examenes/{examenId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo admins desde backend
+    }
+    
+    match /hospitales/{hospitalId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo admins desde backend
+    }
+    
+    match /especialidades/{especialidadId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Solo admins desde backend
+    }
+    
+    // ============================================
+    // DENY POR DEFECTO
+    // ============================================
+    
+    // Cualquier otra colección: denegar acceso
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

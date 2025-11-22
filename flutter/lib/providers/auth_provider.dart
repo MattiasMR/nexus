@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import '../models/usuario.dart';
-import '../models/hospital.dart';
 import '../services/auth_service.dart';
 
 /// Estados de autenticación
@@ -12,7 +11,7 @@ enum AuthStatus {
   error,
 }
 
-/// Provider para gestionar el estado de autenticación
+/// Provider para gestionar el estado de autenticación (APP DE PACIENTES)
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
 
@@ -21,15 +20,11 @@ class AuthProvider with ChangeNotifier {
 
   AuthStatus _status = AuthStatus.initial;
   Usuario? _currentUser;
-  List<Hospital> _userHospitals = [];
-  Hospital? _activeHospital;
   String? _errorMessage;
 
   // Getters
   AuthStatus get status => _status;
   Usuario? get currentUser => _currentUser;
-  List<Hospital> get userHospitals => _userHospitals;
-  Hospital? get activeHospital => _activeHospital;
   String? get errorMessage => _errorMessage;
 
   bool get isAuthenticated => _status == AuthStatus.authenticated && _currentUser != null;
@@ -45,18 +40,11 @@ class AuthProvider with ChangeNotifier {
       final firebaseUser = _authService.currentFirebaseUser;
       
       if (firebaseUser != null) {
-        // Hay sesión activa, obtener datos del usuario
+        // Hay sesión activa, obtener datos del paciente
         final usuario = await _authService.getCurrentUserData();
         
-        if (usuario != null && usuario.esPersonalMedico) {
+        if (usuario != null && usuario.activo) {
           _currentUser = usuario;
-          
-          // Cargar hospitales asignados
-          await _loadUserHospitals();
-          
-          // Cargar último hospital seleccionado
-          await _loadLastHospital();
-          
           _status = AuthStatus.authenticated;
         } else {
           await _authService.signOut();
@@ -66,7 +54,7 @@ class AuthProvider with ChangeNotifier {
         _status = AuthStatus.unauthenticated;
       }
     } catch (e) {
-      print('Error al inicializar auth: $e');
+      debugPrint('Error al inicializar auth: $e');
       _status = AuthStatus.unauthenticated;
     }
     
@@ -92,22 +80,51 @@ class AuthProvider with ChangeNotifier {
       );
 
       _currentUser = usuario;
-      
-      // Cargar hospitales asignados
-      await _loadUserHospitals();
-      
-      // Si tiene un solo hospital, seleccionarlo automáticamente
-      if (_userHospitals.length == 1) {
-        await setActiveHospital(_userHospitals.first);
-        _status = AuthStatus.authenticated;
-      } else {
-        // Si tiene múltiples, intentar cargar el último seleccionado
-        await _loadLastHospital();
-        
-        // Si no hay hospital activo, requiere selección manual
-        _status = AuthStatus.authenticated;
-      }
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error inesperado: ${e.toString()}';
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    }
+  }
 
+  /// Registrar nuevo paciente
+  Future<bool> signUp({
+    required String email,
+    required String password,
+    required String nombre,
+    required String apellido,
+    required String rut,
+    required String telefono,
+    String? fechaNacimiento,
+    String? sexo,
+  }) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final usuario = await _authService.signUpWithEmailAndPassword(
+        email: email,
+        password: password,
+        nombre: nombre,
+        apellido: apellido,
+        rut: rut,
+        telefono: telefono,
+        fechaNacimiento: fechaNacimiento,
+        sexo: sexo,
+      );
+
+      _currentUser = usuario;
+      _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
     } on AuthException catch (e) {
@@ -131,8 +148,6 @@ class AuthProvider with ChangeNotifier {
     try {
       await _authService.signOut();
       _currentUser = null;
-      _userHospitals = [];
-      _activeHospital = null;
       _errorMessage = null;
       _status = AuthStatus.unauthenticated;
     } catch (e) {
@@ -159,60 +174,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Establecer hospital activo
-  Future<void> setActiveHospital(Hospital hospital) async {
-    _activeHospital = hospital;
-    await _authService.saveLastHospitalId(hospital.id);
-    notifyListeners();
-  }
-
-  /// Verificar si necesita seleccionar hospital
-  bool get needsHospitalSelection {
-    return isAuthenticated && 
-           _userHospitals.length > 1 && 
-           _activeHospital == null;
-  }
-
-  /// Cargar hospitales del usuario
-  Future<void> _loadUserHospitals() async {
-    if (_currentUser == null) return;
-
-    try {
-      _userHospitals = await _authService.getUserHospitals(
-        _currentUser!.hospitalesAsignados,
-      );
-    } catch (e) {
-      print('Error al cargar hospitales: $e');
-      _userHospitals = [];
-    }
-  }
-
-  /// Cargar último hospital seleccionado
-  Future<void> _loadLastHospital() async {
-    if (_userHospitals.isEmpty) return;
-
-    try {
-      final lastHospitalId = await _authService.getLastHospitalId();
-      
-      if (lastHospitalId != null) {
-        final hospital = _userHospitals.firstWhere(
-          (h) => h.id == lastHospitalId,
-          orElse: () => _userHospitals.first,
-        );
-        _activeHospital = hospital;
-      } else if (_userHospitals.isNotEmpty) {
-        // Si no hay último hospital, seleccionar el primero
-        _activeHospital = _userHospitals.first;
-        await _authService.saveLastHospitalId(_activeHospital!.id);
-      }
-    } catch (e) {
-      print('Error al cargar último hospital: $e');
-      if (_userHospitals.isNotEmpty) {
-        _activeHospital = _userHospitals.first;
-      }
-    }
-  }
-
   /// Recargar datos del usuario
   Future<void> reloadUser() async {
     if (!isAuthenticated) return;
@@ -221,11 +182,35 @@ class AuthProvider with ChangeNotifier {
       final usuario = await _authService.getCurrentUserData();
       if (usuario != null) {
         _currentUser = usuario;
-        await _loadUserHospitals();
         notifyListeners();
       }
     } catch (e) {
-      print('Error al recargar usuario: $e');
+      debugPrint('Error al recargar usuario: $e');
+    }
+  }
+
+  /// Actualizar datos del perfil del usuario autenticado
+  Future<bool> updateProfile(Map<String, dynamic> updates) async {
+    if (_currentUser == null) {
+      _errorMessage = 'No hay usuario autenticado';
+      notifyListeners();
+      return false;
+    }
+
+    try {
+      final updatedUser = await _authService.updateUserProfile(_currentUser!.id, updates);
+      _currentUser = updatedUser;
+      _errorMessage = null;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error al actualizar perfil: ${e.toString()}';
+      notifyListeners();
+      return false;
     }
   }
 
@@ -239,15 +224,24 @@ class AuthProvider with ChangeNotifier {
     }
     notifyListeners();
   }
-
-  // ========== PERMISOS ==========
-
-  /// Verificar si puede realizar una acción
-  bool puedeRegistrarConsultas() => _currentUser?.puedeRegistrarConsultas ?? false;
-  bool puedeEditarPacientes() => _currentUser?.puedeEditarPacientes ?? false;
-  bool puedeEliminarPacientes() => _currentUser?.puedeEliminarPacientes ?? false;
-  bool puedeVerEstadisticas() => _currentUser?.puedeVerEstadisticas ?? false;
-  bool puedeRecetarMedicamentos() => _currentUser?.puedeRecetarMedicamentos ?? false;
-  bool puedeOrdenarExamenes() => _currentUser?.puedeOrdenarExamenes ?? false;
-  bool puedeRegistrarHospitalizaciones() => _currentUser?.puedeRegistrarHospitalizaciones ?? false;
+  
+  // ========== PERMISOS (PACIENTES) ==========
+  // Esta app es solo para pacientes, estos métodos siempre retornan false
+  
+  /// Hospitales del usuario (pacientes no tienen múltiples hospitales)
+  List<String> get userHospitals => [];
+  
+  /// Establecer hospital activo (no aplica para pacientes)
+  void setActiveHospital(String hospitalId) {
+    // Pacientes no manejan hospitales
+  }
+  
+  /// ¿Puede ver estadísticas? (solo personal médico)
+  bool puedeVerEstadisticas() => false;
+  
+  /// ¿Puede ordenar exámenes? (solo médicos)
+  bool puedeOrdenarExamenes() => false;
+  
+  /// ¿Puede recetar medicamentos? (solo médicos)
+  bool puedeRecetarMedicamentos() => false;
 }
