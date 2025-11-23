@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\WebPayController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -82,5 +83,19 @@ Route::get('/test-firebase', function () {
         ], 500);
     }
 });
+
+// ============================================
+// Rutas de WebPay Plus - Compra de Bonos
+// ============================================
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/comprar-bono', [WebPayController::class, 'showForm'])->name('webpay.form');
+    Route::post('/comprar-bono/iniciar', [WebPayController::class, 'iniciarTransaccion'])->name('webpay.iniciar');
+    Route::get('/comprar-bono/descargar-comprobante', [WebPayController::class, 'descargarComprobante'])->name('webpay.descargar');
+    Route::get('/comprar-bono/descargar-comprobante-html', [WebPayController::class, 'descargarComprobantePDF'])->name('webpay.descargar.html');
+});
+
+// Rutas públicas para confirmación de WebPay (sin auth porque Transbank redirige aquí)
+Route::get('/comprar-bono/confirmar', [WebPayController::class, 'confirmarTransaccion'])->name('webpay.confirmar');
+Route::post('/comprar-bono/confirmar', [WebPayController::class, 'confirmarTransaccion'])->name('webpay.confirmar.post');
 
 require __DIR__.'/settings.php';

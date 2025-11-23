@@ -10,9 +10,9 @@ class FichaMedica
     protected Firestore $firestore;
     protected string $collection = 'fichasMedicas';
 
-    public function __construct(Firestore $firestore)
+    public function __construct()
     {
-        $this->firestore = $firestore;
+        $this->firestore = app(Firestore::class);
     }
 
     /**
