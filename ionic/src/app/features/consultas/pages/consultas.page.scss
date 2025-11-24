@@ -333,6 +333,27 @@ ion-card.panel ion-card-content {
   font-weight: 600;
   text-transform: none;
 }
+.section-header .debug-btn {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  
+  ion-icon {
+    font-size: 1.2rem;
+    color: #666;
+  }
+  
+  &:hover {
+    background: #e0e0e0;
+    border-color: #bbb;
+  }
+}
 
 /* EDIT MODE ACTIONS */
 .edit-actions {
@@ -1067,3 +1088,836 @@ ion-badge {
     --color: white !important;
   }
 }
+
+// ========== POPUP DE SUBIR EXAMEN ==========
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+.popup-content {
+  background: white;
+  border-radius: 16px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #222;
+  }
+  
+  .close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    
+    ion-icon {
+      font-size: 24px;
+      color: #666;
+    }
+    
+    &:hover {
+      background: #f0f0f0;
+    }
+  }
+}
+
+.popup-body {
+  padding: 24px;
+  
+  .patient-info {
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .form-group {
+    margin-bottom: 20px;
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 700;
+      color: #222;
+      font-size: 1rem;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+      background: white;
+      color: black;
+      font-family: inherit;
+      
+      &:focus {
+        outline: none;
+        border-color: var(--c-primary-400);
+        box-shadow: 0 0 0 3px rgba(31, 136, 255, 0.1);
+      }
+      
+      &::placeholder {
+        color: #999;
+      }
+    }
+    
+    textarea.form-input {
+      resize: vertical;
+      min-height: 100px;
+    }
+    
+    select.form-input {
+      cursor: pointer;
+    }
+  }
+}
+
+.popup-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  
+  button {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  
+  .btn-secondary {
+    background: #e0e0e0;
+    color: #333;
+    
+    &:hover {
+      background: #d0d0d0;
+    }
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+    color: white;
+    box-shadow: 0 4px 12px rgba(31, 136, 255, 0.3);
+    
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(31, 136, 255, 0.4);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+.subir-examen-btn {
+  --background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600)) !important;
+  --color: #fff !important;
+  --border-radius: 12px;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  --padding-start: 32px;
+  --padding-end: 32px;
+  --box-shadow: 0 6px 16px rgba(31, 136, 255, .13);
+  font-weight: 600;
+  text-transform: none;
+  transition: transform .12s, box-shadow .12s, filter .12s;
+  min-width: 180px;
+}
+
+.subir-examen-btn:hover {
+  --background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600)) !important;
+  transform: translateY(-1px);
+  --box-shadow: 0 10px 24px rgba(31, 136, 255, .18);
+  filter: saturate(1.08);
+}
+
+.subir-examen-btn:active {
+  transform: translateY(0);
+  --box-shadow: 0 4px 10px rgba(31, 136, 255, .13);
+}
+
+// Popup grande para Nueva Consulta
+.popup-large {
+  max-width: 700px;
+  max-height: 90vh;
+  
+  .popup-body {
+    max-height: calc(90vh - 180px);
+    overflow-y: auto;
+  }
+}
+
+.section-divider {
+  margin: 24px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #1f88ff;
+  
+  label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1f88ff;
+  }
+}
+
+.form-input.invalid {
+  border-color: #f04141;
+  
+  &:focus {
+    border-color: #f04141;
+    box-shadow: 0 0 0 3px rgba(240, 65, 65, 0.1);
+  }
+}
+
+.error-message {
+  color: #f04141;
+  font-size: 0.875rem;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  ion-icon {
+    font-size: 18px;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      transform: none;
+      box-shadow: 0 4px 12px rgba(31, 136, 255, 0.3);
+    }
+  }
+}
+
+// Estilos para subida de archivos
+.file-upload-options {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.file-upload-container {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-upload-btn,
+.camera-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px dashed #cbd5e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  font-size: 15px;
+  
+  ion-icon {
+    font-size: 22px;
+    color: var(--c-primary-500);
+  }
+  
+  span {
+    color: #555;
+    font-weight: 500;
+  }
+  
+  &:hover {
+    background: linear-gradient(135deg, #e9ecef, #dee2e6);
+    border-color: var(--c-primary-400);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    
+    ion-icon {
+      color: var(--c-primary-600);
+    }
+  }
+}
+
+.camera-btn {
+  flex: 1;
+  min-width: 200px;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-color: #90caf9;
+  
+  ion-icon {
+    color: #1976d2;
+  }
+  
+  &:hover {
+    background: linear-gradient(135deg, #bbdefb, #90caf9);
+    border-color: #1976d2;
+    
+    ion-icon {
+      color: #0d47a1;
+    }
+  }
+}
+
+.file-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #777;
+  font-style: italic;
+}
+
+.file-preview {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  
+  > ion-icon {
+    font-size: 32px;
+    color: var(--c-primary-500);
+    flex-shrink: 0;
+  }
+}
+
+.file-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 4px;
+  
+  .file-name {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+  
+  .file-size {
+    font-size: 0.85rem;
+    color: #666;
+  }
+}
+
+.remove-file-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  
+  ion-icon {
+    font-size: 28px;
+    color: #f04141;
+  }
+  
+  &:hover {
+    transform: scale(1.1);
+  }
+}
+
+.image-preview {
+  margin-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 12px;
+  
+  img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// Estilos para la sección de Archivos de Exámenes
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  
+  ion-icon {
+    font-size: 64px;
+    color: #ccc;
+  }
+  
+  p {
+    margin: 16px 0 0 0;
+    color: #999;
+    
+    &:last-child {
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+  }
+}
+
+.archivos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.archivo-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+}
+
+.archivo-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  ion-icon {
+    font-size: 28px;
+    color: #fff;
+  }
+}
+
+.archivo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.archivo-nombre {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2c3e50;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.archivo-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  
+  .examen-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  
+  .archivo-fecha,
+  .archivo-size {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+  }
+}
+
+.archivo-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  
+  ion-icon {
+    font-size: 20px;
+  }
+  
+  &.ver-btn {
+    background: #e3f2fd;
+    
+    ion-icon {
+      color: #1976d2;
+    }
+    
+    &:hover {
+      background: #bbdefb;
+    }
+  }
+  
+  &.delete-btn {
+    background: #ffebee;
+    
+    ion-icon {
+      color: #d32f2f;
+    }
+    
+    &:hover {
+      background: #ffcdd2;
+    }
+  }
+}
+
+// Visor de Archivos
+.archivo-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.archivo-viewer-content {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1000px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.archivo-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  color: #fff;
+  
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.close-viewer-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+  margin-left: 16px;
+  
+  ion-icon {
+    font-size: 24px;
+    color: #fff;
+  }
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+.archivo-viewer-body {
+  flex: 1;
+  overflow: auto;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-viewer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  
+  .image-container {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #f5f5f5;
+    min-height: 400px;
+    
+    img {
+      max-width: 100%;
+      max-height: 500px;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+  }
+}
+
+.pdf-viewer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  object {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #f5f5f5;
+  }
+  
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+  }
+  
+  .pdf-fallback {
+    text-align: center;
+    padding: 40px;
+    
+    ion-icon {
+      margin-bottom: 20px;
+    }
+    
+    p {
+      margin-bottom: 20px;
+      color: var(--c-text-secondary);
+    }
+  }
+  
+  .pdf-message {
+    text-align: center;
+    padding: 40px;
+    max-width: 500px;
+    
+    ion-icon {
+      margin-bottom: 20px;
+    }
+    
+    h4 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--c-text-primary);
+      margin-bottom: 12px;
+    }
+    
+    p {
+      font-size: 1rem;
+      color: var(--c-text-secondary);
+      margin-bottom: 24px;
+      
+      &.pdf-note {
+        font-size: 0.9rem;
+        color: var(--c-text-tertiary);
+        margin-top: 16px;
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+
+.download-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  ion-icon {
+    font-size: 20px;
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.unsupported-viewer {
+  text-align: center;
+  padding: 40px;
+  
+  ion-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+  }
+  
+  h4 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+  }
+  
+  .file-type-info {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 16px;
+  }
+  
+  .preview-message {
+    font-size: 1rem;
+    color: #555;
+    margin-bottom: 24px;
+  }
+}
+
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--c-primary-400), var(--c-primary-600));
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-top: 16px;
+  transition: transform 0.2s;
+  
+  ion-icon {
+    font-size: 20px;
+  }
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.archivo-viewer-footer {
+  padding: 16px 24px;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+}
+
+.archivo-info-footer {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  color: #666;
+  
+  span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Importar estilos OCR
+@import './ocr-styles.scss';

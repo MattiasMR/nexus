@@ -19,9 +19,14 @@
         </div>
         
         <div class="header-actions">
-          <ion-button (click)="nuevaConsulta()" fill="solid" color="primary" class="nueva-consulta-btn">
+          <ion-button (click)="nuevaConsulta()" fill="outline" class="nueva-consulta-btn">
             <ion-icon name="add-circle" slot="start"></ion-icon>
             Nueva Consulta
+          </ion-button>
+          
+          <ion-button (click)="subirExamen()" fill="solid" class="subir-examen-btn">
+            <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
+            Subir Examen
           </ion-button>
           
           <ion-button (click)="verMedicacion()" fill="outline" class="medicacion-btn">
@@ -103,6 +108,55 @@
             </ion-col>
           </ion-row>
         </ion-grid>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- SECCIÓN: Archivos de Exámenes -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <div class="section-header">
+          <ion-icon name="folder-open" class="section-icon"></ion-icon>
+          <ion-card-title>Archivos de Exámenes</ion-card-title>
+          <ion-badge color="primary">{{ archivosExamenes.length }}</ion-badge>
+          <button class="debug-btn" (click)="verDatosFirestore()" title="Ver datos en consola">
+            <ion-icon name="bug-outline"></ion-icon>
+          </button>
+        </div>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <div *ngIf="archivosExamenes.length === 0" class="empty-state">
+          <ion-icon name="cloud-upload-outline" style="font-size: 64px; color: #ccc;"></ion-icon>
+          <p style="color: #999; margin-top: 16px;">No hay archivos de exámenes subidos</p>
+          <p style="color: #999; font-size: 0.9rem;">Usa el botón "Subir Examen" para agregar archivos</p>
+        </div>
+        <div class="archivos-grid" *ngIf="archivosExamenes.length > 0">
+          <div *ngFor="let archivo of archivosExamenes" class="archivo-card">
+            <div class="archivo-icon">
+              <ion-icon [name]="getFileIcon(archivo.tipo)"></ion-icon>
+            </div>
+            <div class="archivo-info">
+              <h4 class="archivo-nombre">{{ archivo.nombre }}</h4>
+              <div class="archivo-metadata">
+                <ion-badge [color]="getTipoExamenColor(archivo.nombreExamen)" class="examen-badge">
+                  {{ archivo.nombreExamen }}
+                </ion-badge>
+                <span class="archivo-fecha">
+                  {{ archivo.fechaSubida?.toDate ? archivo.fechaSubida.toDate() : archivo.fechaSubida | date:'dd/MM/yyyy' }}
+                </span>
+                <span class="archivo-size">{{ formatFileSize(archivo.tamanio) }}</span>
+              </div>
+            </div>
+            <div class="archivo-actions">
+              <button class="icon-btn ver-btn" (click)="abrirArchivo(archivo)" title="Ver archivo">
+                <ion-icon name="eye"></ion-icon>
+              </button>
+              <button class="icon-btn delete-btn" (click)="eliminarArchivoExamen(archivo)" title="Eliminar">
+                <ion-icon name="trash"></ion-icon>
+              </button>
+            </div>
+          </div>
+        </div>
       </ion-card-content>
     </ion-card>
 
@@ -230,5 +284,384 @@
       </ion-card-content>
     </ion-card>
 
+  </div>
+
+  <!-- Popup para Nueva Consulta -->
+  <div *ngIf="showConsultaPopup" class="popup-overlay" (click)="cerrarPopupConsulta()">
+    <div class="popup-content popup-large" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Nueva Consulta - {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</h2>
+        <button class="close-btn" (click)="cerrarPopupConsulta()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <!-- Fecha de Consulta -->
+        <div class="form-group">
+          <label for="fechaConsulta">Fecha de Consulta *</label>
+          <ion-datetime-button datetime="datetime-consulta"></ion-datetime-button>
+          <ion-modal [keepContentsMounted]="true">
+            <ng-template>
+              <ion-datetime 
+                id="datetime-consulta"
+                [(ngModel)]="datosNuevaConsulta.fechaConsulta"
+                presentation="date-time"
+                [max]="maxDate"
+                locale="es-CL">
+              </ion-datetime>
+            </ng-template>
+          </ion-modal>
+        </div>
+
+        <!-- Motivo de Consulta -->
+        <div class="form-group">
+          <label for="motivoConsulta">Motivo de Consulta *</label>
+          <textarea 
+            id="motivoConsulta" 
+            [(ngModel)]="datosNuevaConsulta.motivoConsulta"
+            placeholder="Ej: Dolor abdominal, control de presión, seguimiento..."
+            rows="3"
+            class="form-input"
+            [class.invalid]="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()"></textarea>
+          <div class="error-message" *ngIf="formSubmitted && !datosNuevaConsulta.motivoConsulta.trim()">
+            El motivo de consulta es obligatorio
+          </div>
+        </div>
+
+        <!-- Diagnóstico -->
+        <div class="form-group">
+          <label for="diagnostico">Diagnóstico</label>
+          <textarea 
+            id="diagnostico" 
+            [(ngModel)]="datosNuevaConsulta.diagnostico"
+            placeholder="Ej: Hipertensión arterial esencial, Diabetes tipo 2..."
+            rows="2"
+            class="form-input"></textarea>
+        </div>
+
+        <!-- Tratamiento -->
+        <div class="form-group">
+          <label for="tratamiento">Tratamiento</label>
+          <textarea 
+            id="tratamiento" 
+            [(ngModel)]="datosNuevaConsulta.tratamiento"
+            placeholder="Ej: Enalapril 10mg cada 12hrs, control en 15 días..."
+            rows="3"
+            class="form-input"></textarea>
+        </div>
+
+        <!-- Signos Vitales -->
+        <div class="section-divider">
+          <label>Signos Vitales</label>
+        </div>
+
+        <ion-grid>
+          <ion-row>
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="presionArterial">Presión Arterial (mmHg)</label>
+                <input 
+                  type="text" 
+                  id="presionArterial" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.presionArterial"
+                  placeholder="Ej: 120/80"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="frecuenciaCardiaca">Frecuencia Cardíaca (lpm)</label>
+                <input 
+                  type="number" 
+                  id="frecuenciaCardiaca" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.frecuenciaCardiaca"
+                  placeholder="Ej: 72"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="temperatura">Temperatura (°C)</label>
+                <input 
+                  type="text" 
+                  id="temperatura" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.temperatura"
+                  placeholder="Ej: 36.5"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="saturacionOxigeno">Saturación O2 (%)</label>
+                <input 
+                  type="number" 
+                  id="saturacionOxigeno" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.saturacionOxigeno"
+                  placeholder="Ej: 98"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="peso">Peso (kg)</label>
+                <input 
+                  type="text" 
+                  id="peso" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.peso"
+                  placeholder="Ej: 75.5"
+                  class="form-input">
+              </div>
+            </ion-col>
+
+            <ion-col size="12" sizeMd="6">
+              <div class="form-group">
+                <label for="talla">Talla (cm)</label>
+                <input 
+                  type="text" 
+                  id="talla" 
+                  [(ngModel)]="datosNuevaConsulta.signosVitales.talla"
+                  placeholder="Ej: 170"
+                  class="form-input">
+              </div>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
+
+        <!-- Observaciones -->
+        <div class="form-group">
+          <label for="observaciones">Observaciones</label>
+          <textarea 
+            id="observaciones" 
+            [(ngModel)]="datosNuevaConsulta.observaciones"
+            placeholder="Notas adicionales..."
+            rows="2"
+            class="form-input"></textarea>
+        </div>
+      </div>
+      
+      <div class="popup-actions">
+        <button class="btn-secondary" (click)="cerrarPopupConsulta()">Cancelar</button>
+        <button class="btn-primary" (click)="confirmarNuevaConsulta()" [disabled]="!isConsultaFormValid()">
+          <ion-icon name="add-circle"></ion-icon>
+          Guardar Consulta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup para Subir Examen -->
+  <div *ngIf="showExamenPopup" class="popup-overlay" (click)="cerrarPopupExamen()">
+    <div class="popup-content" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Subir Examen Médico</h2>
+        <button class="close-btn" (click)="cerrarPopupExamen()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <p class="patient-info">Paciente: {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</p>
+        
+        <div class="form-group">
+          <label for="nombreExamen">Tipo de Examen *</label>
+          <input 
+            type="text" 
+            id="nombreExamen" 
+            [(ngModel)]="nuevoExamen.nombreExamen"
+            placeholder="Ej: Hemograma, Radiografía, etc."
+            class="form-input">
+        </div>
+        
+        <div class="form-group">
+          <label for="tipoExamen">Categoría</label>
+          <select id="tipoExamen" [(ngModel)]="nuevoExamen.tipoExamen" class="form-input">
+            <option value="">Seleccionar...</option>
+            <option value="laboratorio">Laboratorio</option>
+            <option value="imagen">Imagen</option>
+            <option value="biopsia">Biopsia</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="resultadoExamen">Resultado/Observaciones</label>
+          <textarea 
+            id="resultadoExamen" 
+            [(ngModel)]="nuevoExamen.resultado"
+            placeholder="Ingrese los resultados o hallazgos del examen"
+            rows="4"
+            class="form-input"></textarea>
+        </div>
+        
+        <!-- Campo de Archivo -->
+        <div class="form-group">
+          <label for="archivoExamen">Archivo del Examen *</label>
+          <div class="file-upload-options">
+            <!-- Botón subir archivo -->
+            <div class="file-upload-container">
+              <input 
+                type="file" 
+                id="archivoExamen" 
+                (change)="onArchivoSeleccionado($event)"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                class="file-input"
+                #fileInput>
+              <label for="archivoExamen" class="file-upload-btn">
+                <ion-icon name="cloud-upload-outline"></ion-icon>
+                <span>Subir archivo</span>
+              </label>
+            </div>
+            
+            <!-- Botón tomar foto -->
+            <button type="button" class="camera-btn" (click)="tomarFoto()">
+              <ion-icon name="camera-outline"></ion-icon>
+              <span>Tomar foto</span>
+            </button>
+          </div>
+          
+          <p class="file-hint">Formatos: PDF, JPG, PNG, DOC • Máx: 10MB</p>
+          
+          <!-- Previsualización del archivo -->
+          <div *ngIf="nuevoExamen.archivo" class="file-preview">
+            <div class="file-info">
+              <ion-icon [name]="nuevoExamen.archivo.type.startsWith('image/') ? 'image' : 'document'"></ion-icon>
+              <div class="file-details">
+                <span class="file-name">{{ nuevoExamen.archivoNombre }}</span>
+                <span class="file-size">{{ (nuevoExamen.archivo.size / 1024 / 1024).toFixed(2) }} MB</span>
+              </div>
+              <button type="button" class="remove-file-btn" (click)="eliminarArchivo()">
+                <ion-icon name="close-circle"></ion-icon>
+              </button>
+            </div>
+            
+            <!-- Previsualización de imagen -->
+            <div *ngIf="nuevoExamen.archivoUrl" class="image-preview">
+              <img [src]="nuevoExamen.archivoUrl" alt="Previsualización">
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="popup-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarPopupExamen()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarExamen()">Guardar Examen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visor de Archivos -->
+  <div *ngIf="archivoViendose" class="archivo-viewer-overlay" (click)="cerrarVisorArchivo()">
+    <div class="archivo-viewer-content" (click)="$event.stopPropagation()">
+      <div class="archivo-viewer-header">
+        <h3>{{ archivoViendose.nombre }}</h3>
+        <button class="close-viewer-btn" (click)="cerrarVisorArchivo()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="archivo-viewer-body">
+        <!-- Visor para imágenes -->
+        <div *ngIf="archivoViendose.tipo.startsWith('image/')" class="image-viewer">
+          <div class="image-container">
+            <img [src]="archivoViendose.url" [alt]="archivoViendose.nombre">
+          </div>
+          
+          <!-- Texto extraído por OCR (editable) -->
+          <div *ngIf="archivoViendose.textoExtraido || archivoViendose.textoEditado" class="ocr-text-section">
+            <div class="ocr-header">
+              <div class="ocr-title">
+                <ion-icon name="document-text-outline"></ion-icon>
+                <h4>Texto Extraído</h4>
+                <span *ngIf="archivoViendose.confianzaOCR" class="confidence-badge">
+                  {{ archivoViendose.confianzaOCR | number:'1.0-0' }}% confianza
+                </span>
+              </div>
+              <button *ngIf="!editandoTexto" class="edit-text-btn" (click)="iniciarEdicionTexto()">
+                <ion-icon name="create-outline"></ion-icon>
+                Editar
+              </button>
+            </div>
+            
+            <!-- Modo lectura -->
+            <div *ngIf="!editandoTexto" class="ocr-text-display">
+              <pre>{{ archivoViendose.textoActual || archivoViendose.textoExtraido }}</pre>
+            </div>
+            
+            <!-- Modo edición -->
+            <div *ngIf="editandoTexto" class="ocr-text-edit">
+              <ion-textarea
+                [(ngModel)]="textoEnEdicion"
+                rows="10"
+                placeholder="Edita el texto extraído..."
+                class="ocr-textarea">
+              </ion-textarea>
+              <div class="edit-actions">
+                <button class="cancel-btn" (click)="cancelarEdicionTexto()">
+                  <ion-icon name="close-outline"></ion-icon>
+                  Cancelar
+                </button>
+                <button class="save-btn" (click)="guardarTextoEditado()">
+                  <ion-icon name="save-outline"></ion-icon>
+                  Guardar cambios
+                </button>
+              </div>
+            </div>
+            
+            <!-- Historial de versiones anteriores -->
+            <div *ngIf="archivoViendose.historialVersiones && archivoViendose.historialVersiones.length > 0" class="historial-section">
+              <div class="historial-header" (click)="mostrarHistorial = !mostrarHistorial">
+                <ion-icon [name]="mostrarHistorial ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+                <span>Versiones anteriores ({{ archivoViendose.historialVersiones.length }})</span>
+              </div>
+              <div *ngIf="mostrarHistorial" class="historial-list">
+                <div *ngFor="let version of archivoViendose.historialVersiones.slice().reverse(); let i = index" class="historial-item">
+                  <div class="historial-header-item">
+                    <div class="historial-info">
+                      <div class="historial-fecha">
+                        {{ version.fecha?.toDate ? (version.fecha.toDate() | date:'dd/MM/yyyy HH:mm') : (version.fecha | date:'dd/MM/yyyy HH:mm') }}
+                        <span class="historial-usuario"> - {{ version.usuario }}</span>
+                      </div>
+                      <div class="historial-descripcion">{{ version.descripcion }}</div>
+                    </div>
+                    <button class="restore-btn" (click)="restaurarVersion(version)" title="Restaurar esta versión">
+                      <ion-icon name="reload-outline"></ion-icon>
+                      Restaurar
+                    </button>
+                  </div>
+                  <div class="historial-texto">
+                    <pre>{{ version.texto || '(texto vacío)' }}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Mensaje para PDFs y otros documentos -->
+        <div *ngIf="!archivoViendose.tipo.startsWith('image/')" class="unsupported-viewer">
+          <ion-icon name="document-text" style="font-size: 64px; color: var(--ion-color-primary);"></ion-icon>
+          <h4>{{ archivoViendose.nombre }}</h4>
+          <p class="file-type-info">{{ archivoViendose.tipo }}</p>
+          <p class="preview-message">Este tipo de documento no puede ser previsualizado</p>
+          <button class="download-btn-primary" (click)="descargarArchivo(archivoViendose)">
+            <ion-icon name="download-outline"></ion-icon>
+            Descargar archivo
+          </button>
+        </div>
+      </div>
+      
+      <div class="archivo-viewer-footer">
+        <div class="archivo-info-footer">
+          <span>Tipo: {{ archivoViendose.tipo }}</span>
+          <span>Tamaño: {{ formatFileSize(archivoViendose.tamanio) }}</span>
+          <span>Fecha: {{ archivoViendose.fechaSubida?.toDate ? (archivoViendose.fechaSubida.toDate() | date:'dd/MM/yyyy HH:mm') : (archivoViendose.fechaSubida | date:'dd/MM/yyyy HH:mm') }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </ion-content>

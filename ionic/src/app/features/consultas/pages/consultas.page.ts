@@ -1,23 +1,26 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { 
   IonHeader, IonToolbar, IonTitle, IonContent, IonIcon, IonButton,
   IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonCardSubtitle,
   IonBadge, IonGrid, IonRow, IonCol, IonList, IonItem, IonLabel,
   IonTextarea, IonTabs, IonTabButton, IonSpinner, IonToast,
-  IonInput, IonSelect, IonSelectOption,
+  IonInput, IonSelect, IonSelectOption, IonDatetime, IonDatetimeButton, IonModal,
   ModalController, ToastController
 } from '@ionic/angular/standalone';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription, firstValueFrom } from 'rxjs';
-import { Timestamp } from '@angular/fire/firestore';
+import { Timestamp, doc, updateDoc, deleteDoc, Firestore } from '@angular/fire/firestore';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 // Servicios Firestore
 import { PacientesService } from '../../pacientes/data/pacientes.service';
 import { FichasMedicasService } from '../../fichas-medicas/data/fichas-medicas.service';
 import { ConsultasService } from '../data/consultas.service';
 import { ExamenesService } from '../../examenes/data/examenes.service';
+import { OcrService } from '../../../services/ocr.service';
 
 // Components
 import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/nueva-consulta-modal.component';
@@ -94,6 +97,7 @@ interface OrdenExamenUI extends OrdenExamen {
     IonCard, IonCardContent, IonCardHeader, IonCardTitle,
     IonBadge, IonGrid, IonRow, IonCol,
     IonTextarea, IonInput, IonSelect, IonSelectOption,
+    IonDatetime, IonDatetimeButton, IonModal,
     CommonModule, FormsModule, TimelineComponent
   ],
 })
@@ -113,6 +117,45 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Variable para las notas rápidas
   nuevaNota: string = '';
   
+  // Popup de Subir Examen
+  showExamenPopup = false;
+  nuevoExamen = {
+    nombreExamen: '',
+    tipoExamen: '',
+    resultado: '',
+    archivo: null as File | null,
+    archivoNombre: '',
+    archivoUrl: ''
+  };
+  
+  // Archivos de exámenes subidos
+  archivosExamenes: any[] = [];
+  
+  // Estado de edición de texto OCR
+  editandoTexto = false;
+  textoEnEdicion = '';
+  mostrarHistorial = false;
+  
+  // Popup de Nueva Consulta
+  showConsultaPopup = false;
+  formSubmitted = false;
+  datosNuevaConsulta = {
+    fechaConsulta: new Date().toISOString(),
+    motivoConsulta: '',
+    diagnostico: '',
+    tratamiento: '',
+    signosVitales: {
+      presionArterial: '',
+      frecuenciaCardiaca: null as number | null,
+      temperatura: '',
+      saturacionOxigeno: null as number | null,
+      peso: '',
+      talla: ''
+    },
+    observaciones: ''
+  };
+  maxDate = new Date().toISOString();
+  
   // Edit mode
   isEditMode = false;
   editedData: any = {};
@@ -123,10 +166,13 @@ export class ConsultasPage implements OnInit, OnDestroy {
   private subscriptions: Subscription[] = [];
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private sanitizer = inject(DomSanitizer);
+  private firestore = inject(Firestore);
   private pacientesService = inject(PacientesService);
   private fichasMedicasService = inject(FichasMedicasService);
   private consultasService = inject(ConsultasService);
   private examenesService = inject(ExamenesService);
+  private ocrService = inject(OcrService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
   private document = inject(DOCUMENT);
@@ -213,6 +259,9 @@ export class ConsultasPage implements OnInit, OnDestroy {
       
       // Build timeline items once after loading data
       this.buildTimelineItems();
+
+      // Cargar archivos de exámenes
+      await this.cargarArchivosExamenes();
 
       this.isLoading = false;
     } catch (error: any) {
@@ -393,43 +442,30 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Open modal to create a new consultation
    * Guard prevents multiple simultaneous opens
    */
-  async nuevaConsulta() {
-    // Prevent multiple modal opens
-    if (this.isModalOpen) {
-      console.log('Modal already open, ignoring request');
+  nuevaConsulta() {
+    if (!this.paciente || !this.fichaId) {
+      this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
       return;
     }
     
-    if (!this.paciente || !this.fichaId) {
-      await this.showToast('Error: No se pudo cargar la información del paciente', 'danger');
-      return;
-    }
-
-    this.isModalOpen = true;
-
-    try {
-      const presentingElement = this.document.querySelector('ion-router-outlet') as HTMLElement | null;
-      const modal = await this.modalCtrl.create({
-        component: NuevaConsultaModalComponent,
-        componentProps: {
-          pacienteId: this.paciente.id,
-          fichaMedicaId: this.fichaId,
-          pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
-        },
-        presentingElement: presentingElement ?? undefined
-      });
-
-      await modal.present();
-
-      const { data, role } = await modal.onWillDismiss();
-
-      if (role === 'confirm' && data) {
-        await this.guardarConsulta(data);
-      }
-    } finally {
-      // Always release the lock
-      this.isModalOpen = false;
-    }
+    // Abrir popup CSS en lugar de ModalController
+    this.showConsultaPopup = true;
+    this.formSubmitted = false;
+    this.datosNuevaConsulta = {
+      fechaConsulta: new Date().toISOString(),
+      motivoConsulta: '',
+      diagnostico: '',
+      tratamiento: '',
+      signosVitales: {
+        presionArterial: '',
+        frecuenciaCardiaca: null,
+        temperatura: '',
+        saturacionOxigeno: null,
+        peso: '',
+        talla: ''
+      },
+      observaciones: ''
+    };
   }
 
   /**
@@ -716,5 +752,1052 @@ export class ConsultasPage implements OnInit, OnDestroy {
 
   agregarNota() {
     this.guardarNota();
+  }
+  
+  /**
+   * Abrir popup para subir examen (CSS overlay, no ModalController)
+   */
+  subirExamen() {
+    console.log('🚀 subirExamen() llamado - Abriendo popup');
+    this.showExamenPopup = true;
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: '',
+      archivo: null,
+      archivoNombre: '',
+      archivoUrl: ''
+    };
+    console.log('📋 Formulario reseteado');
+  }
+  
+  /**
+   * Cerrar popup de examen
+   */
+  cerrarPopupExamen() {
+    this.showExamenPopup = false;
+    this.nuevoExamen = {
+      nombreExamen: '',
+      tipoExamen: '',
+      resultado: '',
+      archivo: null,
+      archivoNombre: '',
+      archivoUrl: ''
+    };
+  }
+  
+  /**
+   * Manejar selección de archivo
+   */
+  async onArchivoSeleccionado(event: Event) {
+    console.log('📁 onArchivoSeleccionado() llamado');
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      console.log('📄 Archivo seleccionado:', file.name, 'Tamaño:', file.size, 'Tipo:', file.type);
+      
+      // Validar tamaño (máximo 10MB pero advertir sobre limitación de Firestore con Base64)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        console.log('❌ Archivo demasiado grande');
+        this.showToast('El archivo es demasiado grande. Máximo 10MB', 'warning');
+        return;
+      }
+      
+      // Advertencia si el archivo es mayor a 1MB (límite de Firestore)
+      if (file.size > 1 * 1024 * 1024) {
+        console.warn('⚠️ Archivo mayor a 1MB. Podría tener problemas con Firestore (límite Base64)');
+        const toast = await this.toastCtrl.create({
+          message: 'Advertencia: Archivo grande (>1MB). Se recomienda usar archivos más pequeños.',
+          duration: 4000,
+          color: 'warning'
+        });
+        await toast.present();
+      }
+      
+      // Validar tipo de archivo - Aceptar más tipos MIME
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/jpg', 
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/msword', // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+        'application/vnd.ms-excel', // .xls
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'text/plain', // .txt
+      ];
+      
+      // Validar también por extensión como fallback
+      const fileName = file.name.toLowerCase();
+      const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx', '.xls', '.xlsx', '.txt'];
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!allowedTypes.includes(file.type) && !hasValidExtension) {
+        console.log('❌ Tipo de archivo no permitido:', file.type);
+        console.log('📝 Extensión del archivo:', fileName.substring(fileName.lastIndexOf('.')));
+        this.showToast('Formato de archivo no permitido. Use PDF, imágenes (JPG, PNG) o documentos (DOC, DOCX)', 'warning');
+        return;
+      }
+      
+      console.log('✅ Archivo validado correctamente');
+      this.nuevoExamen.archivo = file;
+      this.nuevoExamen.archivoNombre = file.name;
+      console.log('✅ Archivo guardado en nuevoExamen.archivo');
+      
+      // Crear URL de previsualización para imágenes
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.nuevoExamen.archivoUrl = e.target?.result as string;
+          console.log('🖼️ URL de previsualización creada');
+        };
+        reader.readAsDataURL(file);
+      }
+    } else {
+      console.log('⚠️ No se detectaron archivos en el input');
+    }
+  }
+  
+  /**
+   * Eliminar archivo seleccionado
+   */
+  eliminarArchivo() {
+    this.nuevoExamen.archivo = null;
+    this.nuevoExamen.archivoNombre = '';
+    this.nuevoExamen.archivoUrl = '';
+    
+    // Limpiar el input file
+    const fileInput = this.document.querySelector('#archivoExamen') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  }
+
+  /**
+   * Tomar foto con la cámara del dispositivo usando HTML5 MediaDevices
+   */
+  async tomarFoto() {
+    try {
+      console.log('📸 Abriendo cámara...');
+      
+      // Verificar si el navegador soporta getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        this.showToast('Tu navegador no soporta acceso a la cámara', 'danger');
+        return;
+      }
+      
+      // Crear elemento de video temporal para capturar
+      const video = document.createElement('video');
+      video.setAttribute('autoplay', '');
+      video.setAttribute('playsinline', '');
+      
+      // Crear modal para mostrar la cámara
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      `;
+      
+      video.style.cssText = `
+        max-width: 100%;
+        max-height: 70vh;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      `;
+      
+      const btnContainer = document.createElement('div');
+      btnContainer.style.cssText = `
+        display: flex;
+        gap: 15px;
+      `;
+      
+      const btnCapture = document.createElement('button');
+      btnCapture.innerHTML = '📸 Capturar';
+      btnCapture.style.cssText = `
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #4CAF50, #45a049);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      `;
+      
+      const btnCancel = document.createElement('button');
+      btnCancel.innerHTML = '❌ Cancelar';
+      btnCancel.style.cssText = `
+        padding: 15px 30px;
+        font-size: 16px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #f44336, #d32f2f);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      `;
+      
+      btnContainer.appendChild(btnCapture);
+      btnContainer.appendChild(btnCancel);
+      modal.appendChild(video);
+      modal.appendChild(btnContainer);
+      document.body.appendChild(modal);
+      
+      // Solicitar acceso a la cámara
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment' }, // Usar cámara trasera en móviles
+        audio: false 
+      });
+      
+      video.srcObject = stream;
+      
+      // Función para capturar la foto
+      const capturarFoto = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0);
+        
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            // Detener el stream
+            stream.getTracks().forEach(track => track.stop());
+            document.body.removeChild(modal);
+            
+            // Crear archivo
+            const fileName = `foto_examen_${Date.now()}.jpg`;
+            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            
+            console.log('📄 Archivo creado:', fileName, 'Tamaño:', file.size);
+            
+            // Validar tamaño
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+              console.log('❌ Foto demasiado grande');
+              this.showToast('La foto es demasiado grande. Máximo 10MB', 'warning');
+              return;
+            }
+            
+            // Advertencia si es mayor a 1MB
+            if (file.size > 1 * 1024 * 1024) {
+              console.warn('⚠️ Foto mayor a 1MB');
+              const toast = await this.toastCtrl.create({
+                message: 'Advertencia: Foto grande (>1MB). Se recomienda reducir calidad.',
+                duration: 4000,
+                color: 'warning'
+              });
+              await toast.present();
+            }
+            
+            // Crear URL de previsualización
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.nuevoExamen.archivoUrl = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+            
+            // Guardar archivo
+            this.nuevoExamen.archivo = file;
+            this.nuevoExamen.archivoNombre = fileName;
+            
+            console.log('✅ Foto guardada en nuevoExamen.archivo');
+            this.showToast('Foto capturada correctamente', 'success');
+          }
+        }, 'image/jpeg', 0.9);
+      };
+      
+      // Evento de captura
+      btnCapture.onclick = capturarFoto;
+      
+      // Evento de cancelar
+      btnCancel.onclick = () => {
+        stream.getTracks().forEach(track => track.stop());
+        document.body.removeChild(modal);
+        console.log('📸 Captura cancelada');
+      };
+      
+    } catch (error) {
+      console.error('❌ Error al abrir cámara:', error);
+      this.showToast('Error al acceder a la cámara. Verifique los permisos.', 'danger');
+    }
+  }
+  
+  /**
+   * Guardar examen con archivo adjunto
+   * NOTA: Actualmente guarda archivos como Base64 en Firestore (modo desarrollo)
+   * Para producción, migrar a Firebase Storage cuando esté disponible
+   */
+  async guardarExamen() {
+    console.log('🔵 guardarExamen() llamado');
+    console.log('📋 Datos del formulario:', {
+      nombreExamen: this.nuevoExamen.nombreExamen,
+      archivo: this.nuevoExamen.archivo,
+      patientId: this.patientId
+    });
+
+    if (!this.nuevoExamen.nombreExamen.trim()) {
+      console.log('❌ Validación falló: nombreExamen vacío');
+      const toast = await this.toastCtrl.create({
+        message: 'Debe ingresar el tipo de examen',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    if (!this.nuevoExamen.archivo) {
+      console.log('❌ Validación falló: archivo no seleccionado');
+      const toast = await this.toastCtrl.create({
+        message: 'Debe seleccionar un archivo',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+
+    if (!this.patientId) {
+      console.log('❌ Validación falló: patientId no disponible');
+      const toast = await this.toastCtrl.create({
+        message: 'Error: No se ha cargado el paciente',
+        duration: 2000,
+        color: 'danger'
+      });
+      await toast.present();
+      return;
+    }
+
+    console.log('✅ Todas las validaciones pasadas, iniciando proceso de guardado...');
+
+    try {
+      this.isLoading = true;
+      console.log('🔄 isLoading = true');
+
+      // MODO DESARROLLO: Convertir archivo a Base64 (sin usar Storage)
+      const timestamp = Date.now();
+      console.log('📦 Convirtiendo archivo a Base64...');
+      
+      const fileBase64 = await this.convertirArchivoABase64(this.nuevoExamen.archivo);
+      console.log('✅ Archivo convertido a Base64');
+      
+      // URL simulada para desarrollo (el archivo se guarda como base64 en Firestore)
+      const downloadURL = `data:${this.nuevoExamen.archivo.type};base64,${fileBase64}`;
+      console.log('📄 URL de datos creada (Base64)');
+
+      // Procesar OCR si es una imagen
+      let textoExtraido = '';
+      let confianzaOCR = 0;
+      
+      if (this.nuevoExamen.archivo.type.startsWith('image/')) {
+        console.log('🔍 Detectada imagen, iniciando OCR...');
+        
+        const toastOCR = await this.toastCtrl.create({
+          message: 'Extrayendo texto de la imagen...',
+          duration: 0,
+          color: 'primary'
+        });
+        await toastOCR.present();
+        
+        try {
+          const ocrResult = await this.ocrService.extractTextFromImage(downloadURL);
+          textoExtraido = ocrResult.text;
+          confianzaOCR = ocrResult.confidence;
+          console.log('✅ OCR completado. Confianza:', confianzaOCR);
+          console.log('📝 Texto extraído:', textoExtraido);
+          
+          await toastOCR.dismiss();
+          
+          if (textoExtraido) {
+            const toastSuccess = await this.toastCtrl.create({
+              message: `Texto extraído exitosamente (${Math.round(confianzaOCR)}% confianza)`,
+              duration: 3000,
+              color: 'success'
+            });
+            await toastSuccess.present();
+          }
+        } catch (error) {
+          console.error('❌ Error en OCR:', error);
+          await toastOCR.dismiss();
+        }
+      }
+
+      // 3. Crear el documento de examen en Firestore
+      const ordenExamen: Omit<OrdenExamen, 'id'> = {
+        idPaciente: this.patientId,
+        idProfesional: 'system', // Aquí deberías poner el ID del usuario actual
+        fecha: Timestamp.now(),
+        estado: 'realizado',
+        examenes: [
+          {
+            idExamen: 'examen-manual-' + timestamp,
+            nombreExamen: this.nuevoExamen.nombreExamen,
+            resultado: this.nuevoExamen.resultado || 'Pendiente de interpretación',
+            fechaResultado: Timestamp.now(),
+            documentos: [
+              {
+                url: downloadURL,
+                nombre: this.nuevoExamen.archivo.name,
+                tipo: this.nuevoExamen.archivo.type,
+                tamanio: this.nuevoExamen.archivo.size,
+                fechaSubida: Timestamp.now(),
+                subidoPor: 'system', // Aquí deberías poner el ID del usuario actual
+                textoExtraido: textoExtraido || undefined,
+                textoActual: textoExtraido || undefined, // La versión actual es la del OCR inicial
+                confianzaOCR: confianzaOCR > 0 ? confianzaOCR : undefined,
+                historialVersiones: []
+              }
+            ]
+          }
+        ],
+        createdAt: Timestamp.now()
+      };
+
+      console.log('📦 Guardando orden de examen en Firestore...');
+      console.log('📋 Estructura completa:', JSON.stringify(ordenExamen, null, 2));
+      console.log('📄 URL del documento (primeros 100 chars):', ordenExamen.examenes[0].documentos![0].url.substring(0, 100) + '...');
+      
+      const ordenId = await this.examenesService.createOrdenExamen(ordenExamen);
+      console.log('✅ Orden de examen guardada exitosamente con ID:', ordenId);
+      console.log('🔍 Verifica en Firebase Console → Firestore → ordenes-examen/' + ordenId);
+
+      const toast = await this.toastCtrl.create({
+        message: 'Examen guardado exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      // Recargar archivos de exámenes
+      await this.cargarArchivosExamenes();
+
+      this.cerrarPopupExamen();
+    } catch (error) {
+      console.error('Error al guardar examen:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al guardar el examen: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Cargar archivos de exámenes del paciente
+   */
+  async cargarArchivosExamenes() {
+    if (!this.patientId) return;
+
+    try {
+      // Obtener todas las órdenes de examen del paciente
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId));
+      
+      // Extraer todos los documentos de todos los exámenes
+      this.archivosExamenes = [];
+      
+      for (const orden of ordenes) {
+        for (const examen of orden.examenes) {
+          if (examen.documentos && examen.documentos.length > 0) {
+            for (const doc of examen.documentos) {
+              this.archivosExamenes.push({
+                ...doc,
+                nombreExamen: examen.nombreExamen,
+                fechaOrden: orden.fecha,
+                ordenId: orden.id,
+                examenId: examen.idExamen
+              });
+            }
+          }
+        }
+      }
+
+      // Ordenar por fecha de subida (más recientes primero)
+      this.archivosExamenes.sort((a, b) => {
+        const dateA = a.fechaSubida instanceof Timestamp ? a.fechaSubida.toDate() : new Date(a.fechaSubida);
+        const dateB = b.fechaSubida instanceof Timestamp ? b.fechaSubida.toDate() : new Date(b.fechaSubida);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      console.log('Archivos de exámenes cargados:', this.archivosExamenes);
+    } catch (error) {
+      console.error('Error al cargar archivos de exámenes:', error);
+    }
+  }
+
+  /**
+   * Abrir archivo en visor embebido
+   */
+  archivoViendose: any = null;
+  
+  abrirArchivo(archivo: any) {
+    console.log('📂 Abriendo archivo:', archivo.nombre);
+    console.log('📋 Tipo MIME:', archivo.tipo);
+    this.archivoViendose = archivo;
+    this.editandoTexto = false;
+    this.mostrarHistorial = false;
+  }
+  
+  cerrarVisorArchivo() {
+    this.archivoViendose = null;
+    this.editandoTexto = false;
+    this.textoEnEdicion = '';
+    this.mostrarHistorial = false;
+  }
+
+  /**
+   * Iniciar edición de texto OCR
+   */
+  iniciarEdicionTexto() {
+    this.editandoTexto = true;
+    this.textoEnEdicion = this.archivoViendose.textoActual || this.archivoViendose.textoExtraido || '';
+  }
+
+  /**
+   * Cancelar edición de texto
+   */
+  cancelarEdicionTexto() {
+    this.editandoTexto = false;
+    this.textoEnEdicion = '';
+  }
+
+  /**
+   * Guardar texto editado con historial
+   */
+  async guardarTextoEditado() {
+    if (!this.archivoViendose || !this.patientId) return;
+
+    try {
+      this.isLoading = true;
+      console.log('💾 Guardando texto editado...');
+
+      // Obtener la orden actual
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId));
+      const ordenActual = ordenes.find(o => o.id === this.archivoViendose.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      // Encontrar el examen y documento
+      const examen = ordenActual.examenes.find(e => e.idExamen === this.archivoViendose.examenId);
+      if (!examen || !examen.documentos) {
+        throw new Error('No se encontró el documento');
+      }
+
+      const docIndex = examen.documentos.findIndex(d => d.url === this.archivoViendose.url);
+      if (docIndex === -1) {
+        throw new Error('No se encontró el documento');
+      }
+
+      // Obtener el texto actual antes de modificar
+      const textoAnterior = this.archivoViendose.textoActual || this.archivoViendose.textoExtraido || '';
+      
+      // Solo guardar en historial si hay texto anterior diferente
+      const historialActualizado = [...(examen.documentos[docIndex].historialVersiones || [])];
+      
+      if (textoAnterior && textoAnterior !== this.textoEnEdicion) {
+        // Guardar la versión anterior en el historial
+        const versionAnterior = {
+          fecha: Timestamp.now(),
+          usuario: 'system', // Aquí deberías poner el ID del usuario actual
+          texto: textoAnterior,
+          descripcion: this.generarDescripcionVersion(textoAnterior, this.textoEnEdicion)
+        };
+        historialActualizado.push(versionAnterior);
+      } else if (!textoAnterior && this.textoEnEdicion) {
+        // Primera edición, guardar versión OCR original si existe
+        const textoOCR = this.archivoViendose.textoExtraido;
+        if (textoOCR) {
+          const versionOCR = {
+            fecha: this.archivoViendose.fechaSubida || Timestamp.now(),
+            usuario: 'OCR',
+            texto: textoOCR,
+            descripcion: 'Versión original extraída por OCR'
+          };
+          historialActualizado.push(versionOCR);
+        }
+      }
+
+      // Actualizar documento con la nueva versión actual
+      examen.documentos[docIndex] = {
+        ...examen.documentos[docIndex],
+        textoActual: this.textoEnEdicion, // Guardar como versión actual
+        historialVersiones: historialActualizado
+      };
+
+      // Guardar en Firestore
+      await this.actualizarOrden(ordenActual);
+
+      // Actualizar vista local
+      this.archivoViendose = {
+        ...this.archivoViendose,
+        textoActual: this.textoEnEdicion,
+        historialVersiones: examen.documentos[docIndex].historialVersiones
+      };
+
+      // Recargar archivos
+      await this.cargarArchivosExamenes();
+
+      const toast = await this.toastCtrl.create({
+        message: 'Texto guardado exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      this.editandoTexto = false;
+      this.textoEnEdicion = '';
+
+    } catch (error) {
+      console.error('❌ Error al guardar texto:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al guardar el texto: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Generar descripción de la versión
+   */
+  private generarDescripcionVersion(textoAnterior: string, textoNuevo: string): string {
+    if (!textoNuevo || textoNuevo.trim() === '') {
+      return 'Texto eliminado completamente';
+    }
+    
+    if (!textoAnterior || textoAnterior.trim() === '') {
+      return 'Primera versión del texto';
+    }
+    
+    const longitudAnterior = textoAnterior.length;
+    const longitudNueva = textoNuevo.length;
+    const diferencia = longitudNueva - longitudAnterior;
+    
+    if (diferencia > 50) {
+      return `Contenido ampliado (+${diferencia} caracteres)`;
+    } else if (diferencia < -50) {
+      return `Contenido reducido (${diferencia} caracteres)`;
+    } else if (Math.abs(diferencia) <= 50) {
+      return 'Texto modificado';
+    }
+    
+    return 'Versión editada';
+  }
+
+  /**
+   * Restaurar una versión anterior del texto
+   */
+  async restaurarVersion(version: any) {
+    const confirmar = confirm(
+      `¿Estás seguro de restaurar esta versión?\n\n` +
+      `Fecha: ${version.fecha?.toDate ? version.fecha.toDate().toLocaleString() : new Date(version.fecha).toLocaleString()}\n` +
+      `Descripción: ${version.descripcion}\n\n` +
+      `La versión actual se guardará en el historial.`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      this.isLoading = true;
+      console.log('🔄 Restaurando versión:', version);
+
+      // Obtener la orden actual
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId!));
+      const ordenActual = ordenes.find(o => o.id === this.archivoViendose.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      // Encontrar el examen y documento
+      const examen = ordenActual.examenes.find(e => e.idExamen === this.archivoViendose.examenId);
+      if (!examen || !examen.documentos) {
+        throw new Error('No se encontró el documento');
+      }
+
+      const docIndex = examen.documentos.findIndex(d => d.url === this.archivoViendose.url);
+      if (docIndex === -1) {
+        throw new Error('No se encontró el documento');
+      }
+
+      // Guardar la versión actual en el historial antes de restaurar
+      const textoActualAnterior = this.archivoViendose.textoActual || '';
+      const historialActualizado = [...(examen.documentos[docIndex].historialVersiones || [])];
+      
+      if (textoActualAnterior) {
+        const versionActualAnterior = {
+          fecha: Timestamp.now(),
+          usuario: 'system',
+          texto: textoActualAnterior,
+          descripcion: 'Versión antes de restaurar'
+        };
+        historialActualizado.push(versionActualAnterior);
+      }
+
+      // Restaurar la versión seleccionada como versión actual
+      examen.documentos[docIndex] = {
+        ...examen.documentos[docIndex],
+        textoActual: version.texto,
+        historialVersiones: historialActualizado
+      };
+
+      // Guardar en Firestore
+      await this.actualizarOrden(ordenActual);
+
+      // Actualizar vista local
+      this.archivoViendose = {
+        ...this.archivoViendose,
+        textoActual: version.texto,
+        historialVersiones: examen.documentos[docIndex].historialVersiones
+      };
+
+      // Recargar archivos
+      await this.cargarArchivosExamenes();
+
+      const toast = await this.toastCtrl.create({
+        message: 'Versión restaurada exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      console.log('✅ Versión restaurada correctamente');
+
+    } catch (error) {
+      console.error('❌ Error al restaurar versión:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al restaurar la versión: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Descargar archivo desde base64
+   */
+  descargarArchivo(archivo: any) {
+    console.log('💾 Descargando archivo:', archivo.nombre);
+    
+    try {
+      // Crear un enlace temporal para descargar
+      const link = document.createElement('a');
+      link.href = archivo.url;
+      link.download = archivo.nombre;
+      link.style.display = 'none';
+      
+      // Agregar al DOM, hacer click y remover
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Descarga iniciada');
+      
+      // Mostrar toast de confirmación
+      this.toastCtrl.create({
+        message: 'Descarga iniciada',
+        duration: 2000,
+        color: 'success'
+      }).then(toast => toast.present());
+      
+    } catch (error) {
+      console.error('❌ Error al descargar archivo:', error);
+      this.toastCtrl.create({
+        message: 'Error al descargar el archivo',
+        duration: 2000,
+        color: 'danger'
+      }).then(toast => toast.present());
+    }
+  }
+  
+  /**
+   * Obtener URL sanitizada para iframe
+   */
+  getSafeUrl(url: string): SafeResourceUrl {
+    console.log('🔒 Sanitizando URL para iframe (primeros 100 chars):', url.substring(0, 100));
+    const safeUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+    console.log('✅ URL sanitizada');
+    return safeUrl;
+  }
+
+  /**
+   * Ver datos de Firestore en consola (debugging)
+   */
+  async verDatosFirestore() {
+    if (!this.patientId) {
+      console.warn('⚠️ No hay paciente seleccionado');
+      return;
+    }
+
+    console.log('🔍 === DATOS DE FIRESTORE ===');
+    console.log('👤 Paciente ID:', this.patientId);
+    
+    try {
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId));
+      console.log('📦 Total de órdenes encontradas:', ordenes.length);
+      console.log('📋 Órdenes completas:', ordenes);
+      
+      ordenes.forEach((orden, index) => {
+        console.log(`\n📄 Orden ${index + 1}:`, {
+          id: orden.id,
+          paciente: orden.idPaciente,
+          fecha: orden.fecha,
+          estado: orden.estado,
+          totalExamenes: orden.examenes.length
+        });
+        
+        orden.examenes.forEach((examen, exIndex) => {
+          console.log(`  🧪 Examen ${exIndex + 1}: ${examen.nombreExamen}`);
+          console.log('     Documentos:', examen.documentos?.length || 0);
+          
+          if (examen.documentos && examen.documentos.length > 0) {
+            examen.documentos.forEach((doc, docIndex) => {
+              console.log(`     📎 Documento ${docIndex + 1}:`, {
+                nombre: doc.nombre,
+                tipo: doc.tipo,
+                tamaño: this.formatFileSize(doc.tamanio),
+                urlPreview: doc.url.substring(0, 50) + '...',
+                urlCompleta: doc.url
+              });
+            });
+          }
+        });
+      });
+      
+      console.log('\n🎯 Archivos procesados para UI:', this.archivosExamenes);
+      console.log('=== FIN DATOS FIRESTORE ===\n');
+      
+      const toast = await this.toastCtrl.create({
+        message: `${ordenes.length} órdenes encontradas. Ver consola (F12)`,
+        duration: 3000,
+        color: 'primary'
+      });
+      await toast.present();
+    } catch (error) {
+      console.error('❌ Error al obtener datos:', error);
+    }
+  }
+
+  /**
+   * Eliminar archivo de examen
+   */
+  async eliminarArchivoExamen(archivo: any) {
+    const confirmacion = confirm(`¿Estás seguro de eliminar el archivo "${archivo.nombre}"?\n\nEsta acción no se puede deshacer.`);
+    if (!confirmacion) return;
+
+    try {
+      this.isLoading = true;
+      console.log('🗑️ Eliminando archivo:', archivo);
+
+      // 1. Obtener la orden completa desde Firestore
+      const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId!));
+      const ordenActual = ordenes.find(o => o.id === archivo.ordenId);
+
+      if (!ordenActual) {
+        throw new Error('No se encontró la orden de examen');
+      }
+
+      console.log('📦 Orden encontrada:', ordenActual);
+
+      // 2. Encontrar el examen que contiene el documento
+      const examenIndex = ordenActual.examenes.findIndex(e => e.idExamen === archivo.examenId);
+      if (examenIndex === -1) {
+        throw new Error('No se encontró el examen');
+      }
+
+      const examen = ordenActual.examenes[examenIndex];
+      console.log('🧪 Examen encontrado:', examen);
+
+      // 3. Filtrar el documento a eliminar
+      if (!examen.documentos || examen.documentos.length === 0) {
+        throw new Error('No hay documentos para eliminar');
+      }
+
+      const nuevosDocumentos = examen.documentos.filter(doc => doc.url !== archivo.url);
+      console.log('📄 Documentos después de filtrar:', nuevosDocumentos.length);
+
+      // 4. Actualizar el examen con los nuevos documentos
+      ordenActual.examenes[examenIndex] = {
+        ...examen,
+        documentos: nuevosDocumentos
+      };
+
+      // 5. Si no quedan documentos y solo hay este examen, eliminar toda la orden
+      if (nuevosDocumentos.length === 0 && ordenActual.examenes.length === 1) {
+        console.log('🗑️ Eliminando orden completa (no quedan documentos)');
+        await this.eliminarOrdenCompleta(ordenActual.id!);
+      } else if (nuevosDocumentos.length === 0) {
+        // Si no quedan documentos pero hay más exámenes, eliminar solo este examen
+        console.log('🗑️ Eliminando examen (no quedan documentos)');
+        ordenActual.examenes.splice(examenIndex, 1);
+        await this.actualizarOrden(ordenActual);
+      } else {
+        // Actualizar la orden con los documentos filtrados
+        console.log('💾 Actualizando orden con documentos filtrados');
+        await this.actualizarOrden(ordenActual);
+      }
+
+      // 6. Recargar la lista de archivos
+      await this.cargarArchivosExamenes();
+
+      const toast = await this.toastCtrl.create({
+        message: 'Archivo eliminado exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+      
+    } catch (error) {
+      console.error('❌ Error al eliminar archivo:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al eliminar el archivo: ' + (error as Error).message,
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Actualizar una orden de examen en Firestore
+   */
+  private async actualizarOrden(orden: OrdenExamen): Promise<void> {
+    const docRef = doc(this.firestore, 'ordenes-examen', orden.id!);
+    
+    await updateDoc(docRef, {
+      examenes: orden.examenes,
+      updatedAt: Timestamp.now()
+    });
+    
+    console.log('✅ Orden actualizada en Firestore');
+  }
+
+  /**
+   * Eliminar una orden completa de examen
+   */
+  private async eliminarOrdenCompleta(ordenId: string): Promise<void> {
+    const docRef = doc(this.firestore, 'ordenes-examen', ordenId);
+    
+    await deleteDoc(docRef);
+    
+    console.log('✅ Orden eliminada completamente de Firestore');
+  }
+
+  /**
+   * Obtener icono según tipo de archivo
+   */
+  getFileIcon(tipo: string): string {
+    if (tipo.includes('pdf')) return 'document-text';
+    if (tipo.includes('image')) return 'image';
+    if (tipo.includes('word') || tipo.includes('document')) return 'document';
+    return 'document-attach';
+  }
+
+  /**
+   * Obtener color según tipo de examen
+   */
+  getTipoExamenColor(nombreExamen: string): string {
+    const nombre = nombreExamen.toLowerCase();
+    if (nombre.includes('sangre') || nombre.includes('hemograma')) return 'danger';
+    if (nombre.includes('orina')) return 'warning';
+    if (nombre.includes('rayos') || nombre.includes('radiograf')) return 'tertiary';
+    if (nombre.includes('resonancia') || nombre.includes('tomograf')) return 'secondary';
+    return 'primary';
+  }
+
+  /**
+   * Formatear tamaño de archivo
+   */
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  /**
+   * Convertir archivo a Base64 (para desarrollo sin Storage)
+   */
+  private convertirArchivoABase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  /**
+   * Cerrar popup de nueva consulta
+   */
+  cerrarPopupConsulta() {
+    this.showConsultaPopup = false;
+    this.formSubmitted = false;
+  }
+  
+  /**
+   * Validar formulario de consulta
+   */
+  isConsultaFormValid(): boolean {
+    return this.datosNuevaConsulta.motivoConsulta.trim().length > 0;
+  }
+  
+  /**
+   * Confirmar y guardar nueva consulta
+   */
+  async confirmarNuevaConsulta() {
+    this.formSubmitted = true;
+    
+    if (!this.isConsultaFormValid()) {
+      const toast = await this.toastCtrl.create({
+        message: 'El motivo de consulta es obligatorio',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    const consultaData = {
+      pacienteId: this.paciente?.id,
+      fichaMedicaId: this.fichaId,
+      fecha: Timestamp.fromDate(new Date(this.datosNuevaConsulta.fechaConsulta)),
+      motivoConsulta: this.datosNuevaConsulta.motivoConsulta,
+      diagnostico: this.datosNuevaConsulta.diagnostico,
+      tratamiento: this.datosNuevaConsulta.tratamiento,
+      signosVitales: this.datosNuevaConsulta.signosVitales,
+      observaciones: this.datosNuevaConsulta.observaciones
+    };
+    
+    await this.guardarConsulta(consultaData);
+    this.cerrarPopupConsulta();
   }
 }
