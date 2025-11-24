@@ -4,21 +4,23 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import '../../models/examen.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/documentos_service.dart';
+import '../../services/documentos_service.dart' show Documento, TipoDocumento;
+import '../../services/examenes_service.dart';
 import '../../utils/app_colors.dart';
 
-/// Página para gestionar documentos médicos del paciente
-class MisDocumentosPage extends StatefulWidget {
-  const MisDocumentosPage({super.key});
+/// Página para revisar exámenes médicos del paciente
+class MisExamenesPage extends StatefulWidget {
+  const MisExamenesPage({super.key});
 
   @override
-  State<MisDocumentosPage> createState() => _MisDocumentosPageState();
+  State<MisExamenesPage> createState() => _MisExamenesPageState();
 }
 
-class _MisDocumentosPageState extends State<MisDocumentosPage> {
-  final DocumentosService _documentosService = DocumentosService();
-  String _filtroActual = 'Todos';
+class _MisExamenesPageState extends State<MisExamenesPage> {
+  final ExamenesService _examenesService = ExamenesService();
+  String _filtroActual = 'Examen';
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +35,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Documentos'),
+        title: const Text('Mis Exámenes'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
@@ -55,7 +57,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
         ],
       ),
       body: StreamBuilder<List<Documento>>(
-        stream: _documentosService.obtenerDocumentosPaciente(usuario.id),
+        stream: _obtenerExamenesPaciente(usuario.id),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -77,7 +79,9 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
           final documentos = snapshot.data ?? [];
           final documentosFiltrados = _filtroActual == 'Todos'
               ? documentos
-              : documentos.where((d) => _getTipoTexto(d.tipo) == _filtroActual).toList();
+              : documentos
+                  .where((d) => _getTipoTexto(d.tipo) == _filtroActual)
+                  .toList();
 
           if (documentosFiltrados.isEmpty) {
             return _buildEmptyState();
@@ -88,7 +92,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
             itemCount: documentosFiltrados.length,
             itemBuilder: (context, index) {
               final documento = documentosFiltrados[index];
-              return _buildDocumentoCard(documento);
+              return _buildExamenCard(documento);
             },
           );
         },
@@ -109,8 +113,8 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
           const SizedBox(height: 16),
           Text(
             _filtroActual == 'Todos'
-                ? 'No tienes documentos'
-                : 'No hay documentos de tipo $_filtroActual',
+                ? 'No tienes exámenes disponibles'
+                : 'No hay exámenes de tipo $_filtroActual',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
@@ -118,7 +122,8 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Sube tus documentos médicos con el botón +',
+            'Los exámenes que suba tu equipo médico en Ionic aparecerán aquí.',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
@@ -129,11 +134,11 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
     );
   }
 
-  Widget _buildDocumentoCard(Documento documento) {
+  Widget _buildExamenCard(Documento documento) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () => _mostrarDetalleDocumento(documento),
+        onTap: () => _mostrarDetalleExamen(documento),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -191,13 +196,25 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
                         ),
                       ],
                     ),
+                    if (documento.url == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6.0),
+                        child: Text(
+                          'Aún no hay archivo adjunto',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               PopupMenuButton<String>(
                 onSelected: (value) => _handleMenuAction(value, documento),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
                     value: 'ver',
                     child: Row(
                       children: [
@@ -207,23 +224,13 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'descargar',
                     child: Row(
                       children: [
                         Icon(Icons.download, size: 20),
                         SizedBox(width: 12),
                         Text('Descargar'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'eliminar',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 12),
-                        Text('Eliminar', style: TextStyle(color: Colors.red)),
                       ],
                     ),
                   ),
@@ -236,7 +243,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
     );
   }
 
-  void _mostrarDetalleDocumento(Documento documento) {
+  void _mostrarDetalleExamen(Documento documento) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -303,7 +310,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
                   child: ElevatedButton.icon(
                     onPressed: () async {
                       Navigator.pop(context);
-                      await _abrirDocumento(documento);
+                       await _abrirExamen(documento);
                     },
                     icon: const Icon(Icons.visibility),
                     label: const Text('Ver'),
@@ -314,7 +321,7 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       Navigator.pop(context);
-                      await _descargarDocumento(documento);
+                       await _descargarExamen(documento);
                     },
                     icon: const Icon(Icons.download),
                     label: const Text('Descargar'),
@@ -328,62 +335,149 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
     );
   }
 
-  Future<void> _abrirDocumento(Documento documento) async {
+  Stream<List<Documento>> _obtenerExamenesPaciente(String idPaciente) {
+    return _examenesService
+        .getOrdenesByPaciente(idPaciente)
+        .map(_ordenesADocumentos);
+  }
+
+  List<Documento> _ordenesADocumentos(List<OrdenExamen> ordenes) {
+    final resultados = <Documento>[];
+
+    for (final orden in ordenes) {
+      if (orden.examenes.isEmpty) {
+        continue;
+      }
+
+      for (final examen in orden.examenes) {
+        final documentos = examen.documentos;
+
+        if (documentos.isEmpty) {
+          resultados.add(
+            Documento(
+              id: '${orden.id ?? 'sinId'}_${examen.idExamen}',
+              idPaciente: orden.idPaciente,
+              nombre: examen.nombreExamen.isNotEmpty
+                  ? examen.nombreExamen
+                  : 'Examen sin nombre',
+              tipo: TipoDocumento.examen,
+              url: null,
+              storagePath: null,
+              tamanio: null,
+              fecha: orden.fecha,
+              createdAt: orden.createdAt ?? orden.fecha,
+              updatedAt: orden.updatedAt ?? orden.fecha,
+            ),
+          );
+          continue;
+        }
+
+        for (var i = 0; i < documentos.length; i++) {
+          final adjunto = documentos[i];
+          resultados.add(
+            Documento(
+              id: '${orden.id ?? 'sinId'}_${examen.idExamen}_$i',
+              idPaciente: orden.idPaciente,
+              nombre: _resolverNombreAdjunto(adjunto, examen.nombreExamen),
+              tipo: _inferirTipoDesdeMime(
+                adjunto.tipo,
+                nombreArchivo: adjunto.nombre,
+              ),
+              url: adjunto.url.isNotEmpty ? adjunto.url : null,
+              storagePath: null,
+              tamanio: adjunto.tamanio,
+              fecha: adjunto.fechaSubida,
+              createdAt: adjunto.fechaSubida,
+              updatedAt: adjunto.fechaSubida,
+            ),
+          );
+        }
+      }
+    }
+
+    resultados.sort((a, b) => b.fecha.compareTo(a.fecha));
+    return resultados;
+  }
+
+  String _resolverNombreAdjunto(DocumentoExamen adjunto, String nombreExamen) {
+    if (adjunto.nombre.trim().isNotEmpty) {
+      return adjunto.nombre.trim();
+    }
+    if (nombreExamen.trim().isNotEmpty) {
+      return nombreExamen.trim();
+    }
+    return 'Examen sin nombre';
+  }
+
+  TipoDocumento _inferirTipoDesdeMime(String? mimeType, {String? nombreArchivo}) {
+    final mime = mimeType?.toLowerCase() ?? '';
+    final nombre = nombreArchivo?.toLowerCase() ?? '';
+
+    if (mime.startsWith('image/') || nombre.endsWith('.png') || nombre.endsWith('.jpg') || nombre.endsWith('.jpeg')) {
+      return TipoDocumento.imagen;
+    }
+
+    if (mime.contains('pdf') || nombre.endsWith('.pdf')) {
+      return TipoDocumento.informe;
+    }
+
+    if (mime.contains('report') || nombre.contains('informe')) {
+      return TipoDocumento.informe;
+    }
+
+    return TipoDocumento.examen;
+  }
+
+  Future<void> _abrirExamen(Documento documento) async {
     if (documento.url == null) {
-      _mostrarMensaje('URL del documento no disponible');
+      _mostrarMensaje('URL del examen no disponible');
       return;
     }
 
     try {
-      debugPrint('📄 Abriendo documento: ${documento.nombre}');
+      debugPrint('📄 Abriendo examen: ${documento.nombre}');
       debugPrint('🔗 URL: ${documento.url}');
-      
-      _mostrarMensaje('Descargando documento...');
-      
-      // Intentar descargar el PDF
+
+      _mostrarMensaje('Descargando examen...');
+
       final response = await http.get(Uri.parse(documento.url!)).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           debugPrint('⏱️ Timeout al descargar');
-          throw Exception('Timeout al descargar el documento');
+          throw Exception('Timeout al descargar el examen');
         },
       );
-      
+
       debugPrint('📡 HTTP Status: ${response.statusCode}');
-      
+
       if (response.statusCode == 200) {
         final directory = await getApplicationDocumentsDirectory();
-        final docsDir = Directory('${directory.path}\\Documentos');
-        
+        final docsDir = Directory('${directory.path}\\Examenes');
+
         if (!await docsDir.exists()) {
           await docsDir.create(recursive: true);
         }
-        
-        // Limpiar nombre de archivo
+
         final fileName = documento.nombre
             .replaceAll(RegExp(r'[^\w\s-]'), '_')
             .replaceAll(' ', '_');
         final filePath = '${docsDir.path}\\$fileName.pdf';
         final file = File(filePath);
-        
+
         await file.writeAsBytes(response.bodyBytes);
-        debugPrint('✅ Documento guardado en: $filePath');
+        debugPrint('✅ Examen guardado en: $filePath');
         debugPrint('📦 Tamaño: ${response.bodyBytes.length} bytes');
-        
-        // Verificar que el archivo existe
+
         if (await file.exists()) {
           debugPrint('✓ Archivo existe, intentando abrir...');
-          
-          // Abrir el archivo con la aplicación predeterminada
+
           final uri = Uri.file(filePath);
           final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-          
+
           if (launched) {
-            _mostrarMensaje('✓ Documento abierto correctamente');
+            _mostrarMensaje('✓ Examen abierto correctamente');
           } else {
-            // Si no se puede abrir, mostrar la ubicación
-            _mostrarMensaje('Documento guardado en: ${docsDir.path}');
-            // Intentar abrir el explorador de archivos
+            _mostrarMensaje('Examen guardado en: ${docsDir.path}');
             await launchUrl(Uri.file(docsDir.path));
           }
         } else {
@@ -392,29 +486,30 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
         }
       } else {
         debugPrint('❌ Error HTTP: ${response.statusCode}');
-        debugPrint('📝 Body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
-        
-        // Intentar abrir URL directamente como fallback
+        final bodyPreview = response.body.length > 200
+            ? response.body.substring(0, 200)
+            : response.body;
+        debugPrint('📝 Body: $bodyPreview');
+
         _mostrarMensaje('Intentando abrir en navegador...');
         final uri = Uri.parse(documento.url!);
         final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-        
+
         if (!launched) {
-          _mostrarMensaje('No se pudo abrir el documento (HTTP ${response.statusCode})');
+          _mostrarMensaje('No se pudo abrir el examen (HTTP ${response.statusCode})');
         }
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ Error al abrir documento: $e');
+      debugPrint('❌ Error al abrir examen: $e');
       debugPrint('Stack trace: $stackTrace');
-      
-      // Último intento: abrir URL directamente en el navegador
+
       try {
         _mostrarMensaje('Intentando abrir en navegador...');
         final uri = Uri.parse(documento.url!);
         final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
-        
+
         if (!launched) {
-          _mostrarMensaje('Error: No se pudo abrir el documento\n$e');
+          _mostrarMensaje('Error: No se pudo abrir el examen\n$e');
         }
       } catch (e2) {
         _mostrarMensaje('Error: $e');
@@ -422,47 +517,46 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
     }
   }
 
-  Future<void> _descargarDocumento(Documento documento) async {
+  Future<void> _descargarExamen(Documento documento) async {
     if (documento.url == null) {
-      _mostrarMensaje('URL del documento no disponible');
+      _mostrarMensaje('URL del examen no disponible');
       return;
     }
 
     try {
-      debugPrint('💾 Descargando documento: ${documento.nombre}');
-      
-      _mostrarMensaje('Descargando documento...');
-      
+      debugPrint('💾 Descargando examen: ${documento.nombre}');
+
+      _mostrarMensaje('Descargando examen...');
+
       final response = await http.get(Uri.parse(documento.url!)).timeout(
         const Duration(seconds: 10),
       );
-      
+
       if (response.statusCode == 200) {
         final directory = await getApplicationDocumentsDirectory();
-        final docsDir = Directory('${directory.path}\\Documentos');
-        
+        final docsDir = Directory('${directory.path}\\Examenes');
+
         if (!await docsDir.exists()) {
           await docsDir.create(recursive: true);
         }
-        
+
         final fileName = documento.nombre
             .replaceAll(RegExp(r'[^\w\s-]'), '_')
             .replaceAll(' ', '_');
         final filePath = '${docsDir.path}\\$fileName.pdf';
         final file = File(filePath);
-        
+
         await file.writeAsBytes(response.bodyBytes);
-        debugPrint('✅ Documento descargado: $filePath');
-        
-        _mostrarMensaje('✓ Documento descargado exitosamente');
-        
-        // Abrir el explorador de archivos en la carpeta
+        debugPrint('✅ Examen descargado: $filePath');
+
+        _mostrarMensaje('✓ Examen descargado exitosamente');
+
         await launchUrl(Uri.file(docsDir.path));
       } else {
         _mostrarMensaje('Error al descargar: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      _mostrarMensaje('Error al descargar documento: $e');
+      _mostrarMensaje('Error al descargar examen: $e');
     }
   }
 
@@ -492,49 +586,12 @@ class _MisDocumentosPageState extends State<MisDocumentosPage> {
   void _handleMenuAction(String action, Documento documento) async {
     switch (action) {
       case 'ver':
-        await _abrirDocumento(documento);
+        await _abrirExamen(documento);
         break;
       case 'descargar':
-        await _descargarDocumento(documento);
-        break;
-      case 'eliminar':
-        _confirmarEliminacion(documento);
+        await _descargarExamen(documento);
         break;
     }
-  }
-
-  void _confirmarEliminacion(Documento documento) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Eliminar Documento'),
-        content: Text(
-          '¿Estás seguro de que deseas eliminar "${documento.nombre}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _documentosService.eliminarDocumento(
-                  documento.id!,
-                  documento.storagePath,
-                );
-                _mostrarMensaje('Documento eliminado');
-              } catch (e) {
-                _mostrarMensaje('Error al eliminar: $e');
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _mostrarMensaje(String mensaje) {

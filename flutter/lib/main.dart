@@ -10,7 +10,7 @@ import 'features/auth/register_page.dart';
 import 'features/paciente/mi_ficha_medica_page.dart';
 import 'features/paciente/mis_citas_page.dart';
 import 'features/paciente/mis_recetas_page.dart';
-import 'features/paciente/mis_documentos_page.dart';
+import 'features/paciente/mis_examenes_page.dart';
 import 'features/paciente/perfil_page.dart';
 
 void main() async {
@@ -109,10 +109,10 @@ class MyApp extends StatelessWidget {
           builder: (context, state) => const MisRecetasPage(),
         ),
         
-        // Mis Documentos
+        // Mis Exámenes
         GoRoute(
-          path: '/mis-documentos',
-          builder: (context, state) => const MisDocumentosPage(),
+          path: '/mis-examenes',
+          builder: (context, state) => const MisExamenesPage(),
         ),
         
         // Perfil
@@ -270,10 +270,10 @@ class HomeScreen extends StatelessWidget {
                       _buildMenuCard(
                         context,
                         icon: Icons.folder_shared,
-                        title: 'Mis Documentos',
-                        subtitle: 'Subir y ver documentos',
+                        title: 'Mis Exámenes',
+                        subtitle: 'Ver los estudios subidos',
                         onTap: () {
-                          context.push('/mis-documentos');
+                          context.push('/mis-examenes');
                         },
                       ),
                       _buildMenuCard(

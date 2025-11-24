@@ -69,7 +69,7 @@ class DocumentoExamen {
       nombre: data['nombre'] ?? '',
       tipo: data['tipo'] ?? '',
       tamanio: data['tamanio'] ?? 0,
-      fechaSubida: DateTime.parse(data['fechaSubida'] ?? DateTime.now().toIso8601String()),
+      fechaSubida: _parseFirestoreDate(data['fechaSubida']) ?? DateTime.now(),
       subidoPor: data['subidoPor'] ?? '',
     );
   }
@@ -84,6 +84,7 @@ class DocumentoExamen {
       'subidoPor': subidoPor,
     };
   }
+
 }
 
 /// Examen solicitado (sub-objeto de OrdenExamen)
@@ -107,9 +108,7 @@ class ExamenSolicitado {
       idExamen: data['idExamen'] ?? '',
       nombreExamen: data['nombreExamen'] ?? '',
       resultado: data['resultado'],
-      fechaResultado: data['fechaResultado'] != null
-          ? DateTime.parse(data['fechaResultado'])
-          : null,
+      fechaResultado: _parseFirestoreDate(data['fechaResultado']),
       documentos: (data['documentos'] as List<dynamic>?)
               ?.map((d) => DocumentoExamen.fromMap(d as Map<String, dynamic>))
               .toList() ??
@@ -128,6 +127,17 @@ class ExamenSolicitado {
   }
 
   bool get tieneResultado => resultado != null && resultado!.isNotEmpty;
+}
+
+DateTime? _parseFirestoreDate(dynamic value) {
+  if (value == null) return null;
+  if (value is Timestamp) {
+    return value.toDate();
+  }
+  if (value is String && value.isNotEmpty) {
+    return DateTime.tryParse(value);
+  }
+  return null;
 }
 
 /// Modelo de Orden de Examen
