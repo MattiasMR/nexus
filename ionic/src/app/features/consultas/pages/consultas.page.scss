@@ -129,20 +129,21 @@ ion-card {
 
 .header-title-row {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
   width: 100%;
   padding: 0;
   margin: 0;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .header-actions {
   display: flex;
   gap: 12px;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .nueva-consulta-btn {
@@ -170,6 +171,33 @@ ion-card {
 .nueva-consulta-btn:active {
   transform: translateY(0);
   --box-shadow: 0 4px 10px rgba(31, 136, 255, .13);
+}
+
+.nueva-orden-btn {
+  --background: linear-gradient(135deg, var(--c-primary-500), var(--c-primary-600)) !important;
+  --color: #fff !important;
+  --border-radius: 12px;
+  --padding-top: 10px;
+  --padding-bottom: 10px;
+  --padding-start: 32px;
+  --padding-end: 32px;
+  --box-shadow: 0 6px 16px rgba(31, 136, 255, .13);
+  font-weight: 600;
+  text-transform: none;
+  transition: transform .12s, box-shadow .12s, filter .12s;
+  min-width: 160px;
+  
+  &:hover {
+    --background: linear-gradient(135deg, var(--c-primary-500), var(--c-primary-600)) !important;
+    transform: translateY(-1px);
+    --box-shadow: 0 10px 24px rgba(31, 136, 255, .18);
+    filter: saturate(1.08);
+  }
+  
+  &:active {
+    transform: translateY(0);
+    --box-shadow: 0 4px 10px rgba(31, 136, 255, .13);
+  }
 }
 
 .header-title {
@@ -309,6 +337,17 @@ ion-card.panel ion-card-content {
   flex: 1;
   justify-content: space-between;
 }
+
+.historial-badge {
+  background: linear-gradient(135deg, var(--c-primary-500), var(--c-primary-600));
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .section-header ion-icon {
   font-size: 1.5rem;
   color: var(--c-primary-600);
@@ -389,20 +428,151 @@ ion-select {
 .info-group {
   margin-bottom: 10px;
 }
+
 .info-item {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   font-size: var(--fs-md);
   color: var(--c-text);
-  margin-bottom: 4px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  
+  &.editing {
+    background: white;
+    border: 3px solid var(--c-primary-400);
+    box-shadow: 0 4px 16px rgba(74, 144, 226, 0.12);
+  }
 }
+
 .info-label {
   font-weight: 700;
   color: var(--c-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  
+  ion-icon {
+    font-size: 18px;
+    color: var(--c-primary-500);
+  }
 }
+
+.info-value {
+  font-size: 1rem;
+  color: #2d3436;
+  font-weight: 500;
+  padding-left: 26px;
+}
+
 .blood-type {
   font-weight: 900;
   color: var(--c-primary-500);
+}
+
+.edit-field {
+  padding-left: 26px;
+  
+  ion-input,
+  ion-select {
+    --background: #f8f9fa;
+    --border-radius: 8px;
+    --padding-start: 16px;
+    --padding-end: 16px;
+    --padding-top: 12px;
+    --padding-bottom: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    
+    &:hover {
+      --background: #e9ecef;
+    }
+    
+    &:focus,
+    &:focus-within {
+      --background: white;
+      box-shadow: 0 0 0 2px var(--c-primary-400) inset;
+      outline: none;
+    }
+  }
+  
+  ion-input::part(native) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  ion-select::part(container) {
+    border: none !important;
+  }
+  
+  ion-select::part(icon) {
+    color: var(--c-primary-500);
+  }
+}
+
+.custom-input {
+  --background: white;
+  --placeholder-color: #adb5bd;
+  --placeholder-opacity: 1;
+  font-weight: 500;
+}
+
+.custom-select {
+  --background: white;
+  --placeholder-color: #adb5bd;
+  font-weight: 500;
+  width: 100%;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 10px;
+  
+  ion-button {
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.3px;
+    
+    &::part(native) {
+      padding: 8px 16px;
+    }
+  }
+}
+
+.btn-guardar-edicion {
+  --background: linear-gradient(135deg, var(--c-primary-500), var(--c-primary-600));
+  --background-hover: linear-gradient(135deg, var(--c-primary-600), var(--c-primary-700));
+  --color: white;
+  --box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+  
+  &::part(native) {
+    transition: all 0.2s ease;
+  }
+  
+  &:hover::part(native) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+  }
+}
+
+.btn-cancelar-edicion {
+  --border-color: #dee2e6;
+  --color: #6c757d;
+  --background-hover: #f8f9fa;
+  
+  &:hover::part(native) {
+    transform: translateY(-1px);
+  }
 }
 
 /* BADGES Y OTROS */
@@ -1299,6 +1469,122 @@ ion-badge {
   }
 }
 
+// ========== POPUP NUEVA ORDEN ==========
+.orden-popup {
+  max-width: 600px;
+  
+  .examenes-list {
+    margin-bottom: 24px;
+    
+    .examenes-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      
+      h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #222;
+      }
+      
+      .btn-add-examen {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+        
+        ion-icon {
+          font-size: 20px;
+        }
+        
+        &:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        
+        &:active {
+          transform: translateY(0);
+        }
+      }
+    }
+    
+    .examen-item {
+      background: #f8f9fa;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+      
+      &:hover {
+        border-color: var(--c-primary-400);
+        box-shadow: 0 2px 8px rgba(31, 136, 255, 0.1);
+      }
+      
+      .examen-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        
+        .examen-numero {
+          font-weight: 700;
+          font-size: 1.1rem;
+          color: var(--c-primary-400);
+        }
+        
+        .btn-remove-examen {
+          background: #dc3545;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          transition: all 0.2s;
+          
+          ion-icon {
+            font-size: 16px;
+          }
+          
+          &:hover {
+            background: #c82333;
+            transform: scale(1.05);
+          }
+          
+          &:active {
+            transform: scale(0.98);
+          }
+        }
+      }
+      
+      .form-group {
+        margin-bottom: 16px;
+        
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
+
+
 .form-input.invalid {
   border-color: #f04141;
   
@@ -1633,6 +1919,149 @@ ion-badge {
   }
 }
 
+// ========== ÓRDENES DE EXÁMENES ==========
+.ordenes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.orden-card {
+  background: #fff;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    border-color: var(--c-primary-400);
+    box-shadow: 0 4px 16px rgba(31, 136, 255, 0.15);
+    transform: translateY(-2px);
+  }
+}
+
+.orden-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f0f0f0;
+  
+  .orden-fecha {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+    
+    ion-icon {
+      font-size: 18px;
+      color: var(--c-primary-400);
+    }
+  }
+  
+  ion-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 8px;
+    
+    ion-icon {
+      font-size: 16px;
+    }
+  }
+}
+
+.orden-examenes {
+  margin-bottom: 16px;
+  
+  .orden-subtitle {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 12px 0;
+  }
+  
+  .examenes-list-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .examen-item-orden {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: background 0.2s;
+    
+    &:hover {
+      background: #e9ecef;
+    }
+    
+    > ion-icon:first-child {
+      font-size: 20px;
+      color: var(--c-primary-400);
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+    
+    .examen-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      
+      .examen-nombre {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #2c3e50;
+      }
+      
+      .examen-instrucciones {
+        font-size: 0.8rem;
+        color: #7f8c8d;
+        font-style: italic;
+      }
+    }
+    
+    .examen-check {
+      font-size: 24px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+  }
+}
+
+.orden-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  
+  .orden-id {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #7f8c8d;
+    font-family: monospace;
+    
+    ion-icon {
+      font-size: 16px;
+    }
+  }
+}
+
 // Visor de Archivos
 .archivo-viewer-overlay {
   position: fixed;
@@ -1883,6 +2312,188 @@ ion-badge {
   }
 }
 
+// Popup de Confirmación de Eliminación
+.confirmacion-eliminar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.confirmacion-eliminar-modal {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 450px;
+  width: 100%;
+  animation: slideUp 0.3s ease-out;
+  overflow: hidden;
+}
+
+.confirmacion-header {
+  padding: 32px 24px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #fff5f5, #ffe8e8);
+  border-bottom: 2px solid #fdd;
+  
+  .icono-warning {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+    
+    ion-icon {
+      font-size: 40px;
+      color: white;
+    }
+  }
+  
+  h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #d63031;
+    letter-spacing: -0.3px;
+  }
+}
+
+.confirmacion-body {
+  padding: 24px;
+  
+  .archivo-nombre {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #2d3436;
+    background: #f8f9fa;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 0 0 16px 0;
+    border-left: 3px solid #ff6b6b;
+    word-break: break-word;
+  }
+  
+  .mensaje-warning {
+    font-size: 0.95rem;
+    color: #636e72;
+    line-height: 1.6;
+    margin: 0;
+  }
+}
+
+.confirmacion-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  
+  button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    
+    ion-icon {
+      font-size: 20px;
+    }
+  }
+  
+  .btn-cancelar {
+    background: #f1f3f5;
+    color: #495057;
+    
+    &:hover {
+      background: #e9ecef;
+      transform: translateY(-1px);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
+  }
+  
+  .btn-eliminar {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+    color: white;
+    box-shadow: 0 4px 12px rgba(238, 90, 82, 0.3);
+    
+    &:hover {
+      background: linear-gradient(135deg, #ee5a52, #d63031);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(238, 90, 82, 0.4);
+    }
+    
+    &:active {
+      transform: translateY(0);
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+// Responsive
+@media (max-width: 600px) {
+  .confirmacion-eliminar-modal {
+    max-width: 90%;
+  }
+  
+  .confirmacion-footer {
+    flex-direction: column;
+    gap: 10px;
+    
+    button {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+}
+
 .archivo-viewer-footer {
   padding: 16px 24px;
   background: #fff;
@@ -1915,6 +2526,56 @@ ion-badge {
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Estilos para historial expandible
+.expandir-container {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 2px dashed #e9ecef;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-expandir {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px solid #dee2e6;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #495057;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  
+  span {
+    flex: 1;
+  }
+  
+  .icono-expandir {
+    font-size: 20px;
+    transition: transform 0.3s ease;
+    color: var(--c-primary-600);
+  }
+  
+  &:hover {
+    background: linear-gradient(135deg, #e9ecef, #dee2e6);
+    border-color: var(--c-primary-400);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    
+    .icono-expandir {
+      transform: scale(1.2);
+    }
+  }
+  
+  &:active {
     transform: translateY(0);
   }
 }
