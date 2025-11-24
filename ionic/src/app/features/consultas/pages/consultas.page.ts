@@ -131,10 +131,27 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Archivos de exámenes subidos
   archivosExamenes: any[] = [];
   
+  // Órdenes de exámenes
+  ordenesExamenes: OrdenExamen[] = [];
+  
   // Estado de edición de texto OCR
   editandoTexto = false;
   textoEnEdicion = '';
   mostrarHistorial = false;
+  
+  // Popup de confirmación de eliminación
+  mostrarConfirmacionEliminar = false;
+  archivoAEliminar: any = null;
+  
+  // Estado del historial médico expandible
+  historialExpandido = false;
+  
+  // Popup de Nueva Orden de Examen
+  showOrdenPopup = false;
+  datosNuevaOrden = {
+    examenes: [{ nombre: '', instrucciones: '' }],
+    observaciones: ''
+  };
   
   // Popup de Nueva Consulta
   showConsultaPopup = false;
@@ -262,6 +279,9 @@ export class ConsultasPage implements OnInit, OnDestroy {
 
       // Cargar archivos de exámenes
       await this.cargarArchivosExamenes();
+      
+      // Cargar órdenes de exámenes
+      await this.cargarOrdenesExamenes();
 
       this.isLoading = false;
     } catch (error: any) {
@@ -562,6 +582,209 @@ export class ConsultasPage implements OnInit, OnDestroy {
         queryParams: { patientId: this.patientId } 
       });
     }
+  }
+
+  /**
+   * Abrir popup para crear nueva orden de examen
+   */
+  nuevaOrdenExamen() {
+    if (!this.patientId) {
+      this.showToast('Error: No se ha cargado el paciente', 'danger');
+      return;
+    }
+    
+    // Reset form
+    this.datosNuevaOrden = {
+      examenes: [{ nombre: '', instrucciones: '' }],
+      observaciones: ''
+    };
+    
+    this.showOrdenPopup = true;
+  }
+
+  /**
+   * Agregar otro examen al formulario
+   */
+  agregarExamen() {
+    this.datosNuevaOrden.examenes.push({ nombre: '', instrucciones: '' });
+  }
+
+  /**
+   * Eliminar un examen del formulario
+   */
+  eliminarExamen(index: number) {
+    if (this.datosNuevaOrden.examenes.length > 1) {
+      this.datosNuevaOrden.examenes.splice(index, 1);
+    }
+  }
+
+  /**
+   * Guardar nueva orden de examen
+   */
+  async guardarNuevaOrden() {
+    // Validar que al menos un examen tenga nombre
+    const hayExamenValido = this.datosNuevaOrden.examenes.some(e => e.nombre.trim());
+    
+    if (!hayExamenValido) {
+      const toast = await this.toastCtrl.create({
+        message: 'Debe agregar al menos un examen',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+
+    try {
+      this.isLoading = true;
+
+      // Filtrar exámenes válidos
+      const examenesValidos = this.datosNuevaOrden.examenes
+        .filter(e => e.nombre.trim())
+        .map(e => ({
+          idExamen: 'examen-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+          nombreExamen: e.nombre,
+          resultado: e.instrucciones || 'Pendiente'
+        }));
+
+      const ordenExamen = {
+        idPaciente: this.patientId!,
+        idProfesional: 'system', // Aquí deberías poner el ID del usuario actual
+        fecha: Timestamp.now(),
+        estado: 'pendiente' as const,
+        examenes: examenesValidos,
+        createdAt: Timestamp.now()
+      };
+
+      await this.examenesService.createOrdenExamen(ordenExamen);
+
+      const toast = await this.toastCtrl.create({
+        message: 'Orden de examen creada exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      this.cerrarPopupOrden();
+      
+      // Recargar archivos de exámenes
+      await this.cargarArchivosExamenes();
+      
+      // Recargar órdenes
+      await this.cargarOrdenesExamenes();
+      
+    } catch (error) {
+      console.error('Error al guardar orden de examen:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al crear la orden de examen',
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * Cerrar popup de nueva orden
+   */
+  cerrarPopupOrden() {
+    this.showOrdenPopup = false;
+  }
+  
+  /**
+   * Cargar órdenes de exámenes del paciente
+   */
+  async cargarOrdenesExamenes() {
+    try {
+      if (!this.patientId) return;
+      
+      const ordenes$ = this.examenesService.getOrdenesByPaciente(this.patientId);
+      const ordenes = await firstValueFrom(ordenes$);
+      
+      this.ordenesExamenes = ordenes.sort((a: OrdenExamen, b: OrdenExamen) => {
+        const fechaA = a.fecha instanceof Timestamp ? a.fecha.toDate() : new Date(a.fecha);
+        const fechaB = b.fecha instanceof Timestamp ? b.fecha.toDate() : new Date(b.fecha);
+        return fechaB.getTime() - fechaA.getTime(); // Más reciente primero
+      });
+      
+      console.log('Órdenes de exámenes cargadas:', this.ordenesExamenes);
+    } catch (error) {
+      console.error('Error al cargar órdenes de exámenes:', error);
+    }
+  }
+  
+  /**
+   * Calcular el estado real de una orden basado en fecha y completitud
+   */
+  getEstadoOrden(orden: OrdenExamen): 'pendiente' | 'completo' | 'atrasado' {
+    // Si la orden está marcada como realizado, está completa
+    if (orden.estado === 'realizado') {
+      return 'completo';
+    }
+    
+    // Si está cancelada, considerarla como pendiente
+    if (orden.estado === 'cancelado') {
+      return 'pendiente';
+    }
+    
+    // Verificar si todos los exámenes tienen documentos subidos
+    const todosCompletos = orden.examenes.every(examen => 
+      examen.documentos && examen.documentos.length > 0
+    );
+    
+    if (todosCompletos) {
+      return 'completo';
+    }
+    
+    // Si está pendiente, verificar si está atrasado (más de 30 días)
+    const fechaOrden = orden.fecha instanceof Timestamp ? orden.fecha.toDate() : new Date(orden.fecha);
+    const hoy = new Date();
+    const diasTranscurridos = Math.floor((hoy.getTime() - fechaOrden.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diasTranscurridos > 30) {
+      return 'atrasado';
+    }
+    
+    return 'pendiente';
+  }
+  
+  /**
+   * Obtener el color del badge según el estado
+   */
+  getColorEstado(estado: string): string {
+    switch (estado) {
+      case 'completo':
+        return 'success';
+      case 'atrasado':
+        return 'danger';
+      case 'pendiente':
+      default:
+        return 'warning';
+    }
+  }
+  
+  /**
+   * Obtener el ícono según el estado
+   */
+  getIconoEstado(estado: string): string {
+    switch (estado) {
+      case 'completo':
+        return 'checkmark-circle';
+      case 'atrasado':
+        return 'alert-circle';
+      case 'pendiente':
+      default:
+        return 'time';
+    }
+  }
+  
+  /**
+   * Convertir Timestamp o Date a Date
+   */
+  getFechaOrden(fecha: Date | Timestamp): Date {
+    return fecha instanceof Timestamp ? fecha.toDate() : fecha;
   }
 
   estadoExamenColor(estado: string): string {
@@ -956,33 +1179,64 @@ export class ConsultasPage implements OnInit, OnDestroy {
       modal.appendChild(btnContainer);
       document.body.appendChild(modal);
       
-      // Solicitar acceso a la cámara
+      // Solicitar acceso a la cámara con restricción de resolución
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, // Usar cámara trasera en móviles
+        video: { 
+          facingMode: 'environment', // Usar cámara trasera en móviles
+          width: { ideal: 1920 },    // Limitar ancho a Full HD
+          height: { ideal: 1080 }    // Limitar alto a Full HD
+        },
         audio: false 
       });
       
       video.srcObject = stream;
       
-      // Función para capturar la foto
-      const capturarFoto = () => {
+      // Función para capturar y redimensionar la foto
+      const capturarFoto = async () => {
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(video, 0, 0);
         
+        // Dimensiones máximas deseadas (HD ready)
+        const maxWidth = 1280;
+        const maxHeight = 720;
+        
+        let width = video.videoWidth;
+        let height = video.videoHeight;
+        
+        // Calcular nuevas dimensiones manteniendo aspect ratio
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = width * ratio;
+          height = height * ratio;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0, width, height);
+        
+        // Convertir a blob con calidad reducida (60%)
         canvas.toBlob(async (blob) => {
           if (blob) {
             // Detener el stream
             stream.getTracks().forEach(track => track.stop());
             document.body.removeChild(modal);
             
+            console.log('📄 Foto capturada - Tamaño original del blob:', blob.size);
+            
+            // Si aún es muy grande, comprimir más
+            let finalBlob = blob;
+            if (blob.size > 800 * 1024) { // Si es mayor a 800KB
+              console.log('🔄 Foto muy grande, aplicando compresión adicional...');
+              finalBlob = await this.comprimirImagen(canvas, 0.4); // Calidad 40%
+              console.log('📉 Tamaño después de compresión:', finalBlob.size);
+            }
+            
             // Crear archivo
             const fileName = `foto_examen_${Date.now()}.jpg`;
-            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            const file = new File([finalBlob], fileName, { type: 'image/jpeg' });
             
-            console.log('📄 Archivo creado:', fileName, 'Tamaño:', file.size);
+            console.log('📄 Archivo creado:', fileName, 'Tamaño final:', file.size, '(' + (file.size / 1024).toFixed(2) + ' KB)');
             
             // Validar tamaño
             const maxSize = 10 * 1024 * 1024; // 10MB
@@ -996,7 +1250,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
             if (file.size > 1 * 1024 * 1024) {
               console.warn('⚠️ Foto mayor a 1MB');
               const toast = await this.toastCtrl.create({
-                message: 'Advertencia: Foto grande (>1MB). Se recomienda reducir calidad.',
+                message: `Foto: ${(file.size / 1024 / 1024).toFixed(2)}MB. Se recomienda usar archivos más pequeños.`,
                 duration: 4000,
                 color: 'warning'
               });
@@ -1017,7 +1271,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
             console.log('✅ Foto guardada en nuevoExamen.archivo');
             this.showToast('Foto capturada correctamente', 'success');
           }
-        }, 'image/jpeg', 0.9);
+        }, 'image/jpeg', 0.6); // Calidad inicial 60%
       };
       
       // Evento de captura
@@ -1606,16 +1860,26 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Eliminar archivo de examen
    */
   async eliminarArchivoExamen(archivo: any) {
-    const confirmacion = confirm(`¿Estás seguro de eliminar el archivo "${archivo.nombre}"?\n\nEsta acción no se puede deshacer.`);
-    if (!confirmacion) return;
+    // Mostrar popup de confirmación personalizado
+    this.archivoAEliminar = archivo;
+    this.mostrarConfirmacionEliminar = true;
+  }
+
+  /**
+   * Confirmar eliminación de archivo
+   */
+  async confirmarEliminacion() {
+    this.mostrarConfirmacionEliminar = false;
+    
+    if (!this.archivoAEliminar) return;
 
     try {
       this.isLoading = true;
-      console.log('🗑️ Eliminando archivo:', archivo);
+      console.log('🗑️ Eliminando archivo:', this.archivoAEliminar);
 
       // 1. Obtener la orden completa desde Firestore
       const ordenes = await firstValueFrom(this.examenesService.getOrdenesByPaciente(this.patientId!));
-      const ordenActual = ordenes.find(o => o.id === archivo.ordenId);
+      const ordenActual = ordenes.find(o => o.id === this.archivoAEliminar.ordenId);
 
       if (!ordenActual) {
         throw new Error('No se encontró la orden de examen');
@@ -1624,7 +1888,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
       console.log('📦 Orden encontrada:', ordenActual);
 
       // 2. Encontrar el examen que contiene el documento
-      const examenIndex = ordenActual.examenes.findIndex(e => e.idExamen === archivo.examenId);
+      const examenIndex = ordenActual.examenes.findIndex(e => e.idExamen === this.archivoAEliminar.examenId);
       if (examenIndex === -1) {
         throw new Error('No se encontró el examen');
       }
@@ -1637,7 +1901,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
         throw new Error('No hay documentos para eliminar');
       }
 
-      const nuevosDocumentos = examen.documentos.filter(doc => doc.url !== archivo.url);
+      const nuevosDocumentos = examen.documentos.filter(doc => doc.url !== this.archivoAEliminar.url);
       console.log('📄 Documentos después de filtrar:', nuevosDocumentos.length);
 
       // 4. Actualizar el examen con los nuevos documentos
@@ -1681,7 +1945,40 @@ export class ConsultasPage implements OnInit, OnDestroy {
       await toast.present();
     } finally {
       this.isLoading = false;
+      this.archivoAEliminar = null;
     }
+  }
+
+  /**
+   * Cancelar eliminación de archivo
+   */
+  cancelarEliminacion() {
+    this.mostrarConfirmacionEliminar = false;
+    this.archivoAEliminar = null;
+  }
+
+  /**
+   * Alternar expansión del historial médico
+   */
+  toggleHistorial() {
+    this.historialExpandido = !this.historialExpandido;
+  }
+
+  /**
+   * Obtener items del historial para mostrar (limitados o completos)
+   */
+  get timelineItemsVisible() {
+    if (this.historialExpandido) {
+      return this.timelineItems;
+    }
+    return this.timelineItems.slice(0, 3);
+  }
+
+  /**
+   * Verificar si hay más items para mostrar
+   */
+  get hayMasItems() {
+    return this.timelineItems.length > 3;
   }
 
   /**
@@ -1752,6 +2049,21 @@ export class ConsultasPage implements OnInit, OnDestroy {
       };
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Comprimir imagen usando canvas con calidad específica
+   */
+  private comprimirImagen(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Error al comprimir imagen'));
+        }
+      }, 'image/jpeg', quality);
     });
   }
   
