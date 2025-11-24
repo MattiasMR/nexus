@@ -213,6 +213,25 @@ class AuthService {
     }
   }
 
+  /// Stream con todos los pacientes (para selección rápida en MVP)
+  Stream<List<Usuario>> streamAllPacientes() {
+    return _firestore
+        .collection('pacientes')
+        .orderBy('nombre')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .where((doc) => doc.exists)
+            .map(Usuario.fromFirestore)
+            .toList());
+  }
+
+  /// Obtener un paciente específico por su ID
+  Future<Usuario?> getUsuarioById(String userId) async {
+    final doc = await _firestore.collection('pacientes').doc(userId).get();
+    if (!doc.exists) return null;
+    return Usuario.fromFirestore(doc);
+  }
+
   /// Actualizar datos del perfil del paciente autenticado
   Future<Usuario> updateUserProfile(String userId, Map<String, dynamic> updates) async {
     try {
