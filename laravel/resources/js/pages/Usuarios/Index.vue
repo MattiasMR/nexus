@@ -26,7 +26,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Users, Search, Filter, UserCheck, UserX, Shield, Stethoscope, User } from 'lucide-vue-next';
+import { Users, Search, Filter, UserCheck, UserX, Shield, Stethoscope, User, UserPlus } from 'lucide-vue-next';
 import { ref, computed, watch } from 'vue';
 import { type BreadcrumbItem } from '@/types';
 
@@ -93,6 +93,11 @@ watch([rolSeleccionado, estadoSeleccionado, busqueda], () => {
 // Ver detalle de usuario
 const verUsuario = (id: string) => {
     router.get(`/usuarios/${id}`);
+};
+
+// Crear nuevo usuario
+const crearUsuario = () => {
+    router.get('/usuarios/crear');
 };
 
 // Formatear fecha
@@ -303,8 +308,16 @@ const getBadgeEstado = (activo: boolean) => {
             <!-- Tabla de usuarios -->
             <Card>
                 <CardHeader>
-                    <CardTitle>Listado de Usuarios</CardTitle>
-                    <CardDescription>Click en un usuario para ver más detalles</CardDescription>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Listado de Usuarios</CardTitle>
+                            <CardDescription>Click en un usuario para ver más detalles</CardDescription>
+                        </div>
+                        <Button @click="crearUsuario" class="bg-primary hover:bg-primary/90">
+                            <UserPlus class="mr-2 h-4 w-4" />
+                            Nuevo Usuario
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div v-if="error" class="rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4">

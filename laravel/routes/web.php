@@ -35,6 +35,8 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     
     // Rutas de gestión de usuarios
     Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::get('/usuarios/crear', [UsuarioController::class, 'create'])->name('usuarios.create');
+    Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::get('/usuarios/{id}', [UsuarioController::class, 'show'])->name('usuarios.show');
     Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
     Route::put('/usuarios/{id}/password', [UsuarioController::class, 'updatePassword'])->name('usuarios.password');

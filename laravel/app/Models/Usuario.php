@@ -101,28 +101,43 @@ class Usuario implements Authenticatable, JsonSerializable
 
     /**
      * Crear un nuevo usuario
+     * 
+     * Campos requeridos: email, displayName, rut, rol
+     * Campos opcionales: telefono, photoURL, activo
+     * 
+     * IMPORTANTE: 
+     * - El RUT debe ser único en el sistema
+     * - El email debe ser único en el sistema
+     * - Si rol = 'paciente', se puede vincular con idPaciente (opcional)
+     * - Si rol = 'profesional', se puede vincular con idProfesional (opcional)
      */
     public static function create(array $data): array
     {
         $instance = new self();
         
         try {
+            // Validar campos requeridos
+            if (empty($data['email'])) {
+                throw new \Exception('El email es requerido');
+            }
+            if (empty($data['displayName'])) {
+                throw new \Exception('El nombre completo es requerido');
+            }
+            if (empty($data['rut'])) {
+                throw new \Exception('El RUT es requerido');
+            }
+            if (empty($data['rol'])) {
+                throw new \Exception('El rol es requerido');
+            }
+
             // Validar que el email sea único
-            if (isset($data['email']) && $instance->emailExists($data['email'])) {
+            if ($instance->emailExists($data['email'])) {
                 throw new \Exception("El email {$data['email']} ya está registrado");
             }
 
-            // Validar relación paciente-usuario
-            if (isset($data['rol']) && $data['rol'] === 'paciente') {
-                if (!isset($data['idPaciente'])) {
-                    throw new \Exception('Los usuarios con rol paciente deben tener idPaciente');
-                }
-                
-                if ($instance->pacienteHasUser($data['idPaciente'])) {
-                    throw new \Exception("El paciente {$data['idPaciente']} ya tiene un usuario asociado");
-                }
-            } elseif (isset($data['idPaciente'])) {
-                throw new \Exception('Solo los usuarios con rol paciente pueden tener idPaciente');
+            // Validar que el RUT sea único
+            if ($instance->rutExists($data['rut'])) {
+                throw new \Exception("El RUT {$data['rut']} ya está registrado");
             }
 
             // Agregar timestamps
@@ -226,9 +241,44 @@ class Usuario implements Authenticatable, JsonSerializable
     }
 
     /**
-     * Verificar si un paciente ya tiene usuario
+     * Buscar usuario por RUT
      */
-    public function pacienteHasUser(string $idPaciente): bool
+    public function findByRut(string $rut): ?array
+    {
+        try {
+            $documents = $this->firestore
+                ->database()
+                ->collection($this->collection)
+                ->where('rut', '=', $rut)
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    return $data;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            logger()->error("Error buscando usuario por RUT {$rut}: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Verificar si un RUT ya existe
+     */
+    public function rutExists(string $rut): bool
+    {
+        return $this->findByRut($rut) !== null;
+    }
+
+    /**
+     * Buscar usuario vinculado a un paciente
+     */
+    public function findByPacienteId(string $idPaciente): ?array
     {
         try {
             $documents = $this->firestore
@@ -240,15 +290,61 @@ class Usuario implements Authenticatable, JsonSerializable
 
             foreach ($documents as $document) {
                 if ($document->exists()) {
-                    return true;
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    return $data;
                 }
             }
 
-            return false;
+            return null;
         } catch (\Exception $e) {
-            logger()->error("Error verificando paciente {$idPaciente}: " . $e->getMessage());
-            return false;
+            logger()->error("Error buscando usuario por idPaciente {$idPaciente}: " . $e->getMessage());
+            return null;
         }
+    }
+
+    /**
+     * Buscar usuario vinculado a un profesional
+     */
+    public function findByProfesionalId(string $idProfesional): ?array
+    {
+        try {
+            $documents = $this->firestore
+                ->database()
+                ->collection($this->collection)
+                ->where('idProfesional', '=', $idProfesional)
+                ->limit(1)
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    return $data;
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            logger()->error("Error buscando usuario por idProfesional {$idProfesional}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Verificar si un paciente ya tiene usuario
+     */
+    public function pacienteHasUser(string $idPaciente): bool
+    {
+        return $this->findByPacienteId($idPaciente) !== null;
+    }
+
+    /**
+     * Verificar si un profesional ya tiene usuario
+     */
+    public function profesionalHasUser(string $idProfesional): bool
+    {
+        return $this->findByProfesionalId($idProfesional) !== null;
     }
 
     /**

@@ -136,15 +136,13 @@ class UsuariosPermisosSeeder extends Seeder
         // ============================================
         echo "🏥 Creando usuarios Paciente...\n";
 
-        // IDs de pacientes reales de la base de datos
-        $idPaciente1 = 'Fh2byylkEBfJCxd2vD1P';
-        $idPaciente2 = 'SUso7Nyhb18whZ21Z2Ux';
-
+        // Crear usuarios pacientes (sin vincular a pacientes existentes aún)
         $paciente1Data = [
             'email' => 'juan.perez@email.com',
             'displayName' => 'Juan Pérez',
+            'rut' => '12345678-9',
+            'telefono' => '+56912345678',
             'rol' => 'paciente',
-            'idPaciente' => $idPaciente1,
             'activo' => true,
         ];
         $pacienteUser1 = $crearORecuperarUsuario($paciente1Data);
@@ -152,8 +150,9 @@ class UsuariosPermisosSeeder extends Seeder
         $paciente2Data = [
             'email' => 'maria.lopez@email.com',
             'displayName' => 'María López',
+            'rut' => '98765432-1',
+            'telefono' => '+56987654321',
             'rol' => 'paciente',
-            'idPaciente' => $idPaciente2,
             'activo' => true,
         ];
         $pacienteUser2 = $crearORecuperarUsuario($paciente2Data);
@@ -194,6 +193,7 @@ class UsuariosPermisosSeeder extends Seeder
         echo "⚠️  IMPORTANTE:\n";
         echo "   • Configura las contraseñas en Firebase Authentication\n";
         echo "   • Hospital: RSAlN3zsmWzeoY3z9GzN\n";
-        echo "   • Pacientes vinculados: Fh2byylkEBfJCxd2vD1P, SUso7Nyhb18whZ21Z2Ux\n\n";
+        echo "   • Todos los usuarios ya están vinculados con su rol correspondiente\n";
+        echo "   • Los pacientes están listos para ser vinculados a datos médicos\n\n";
     }
 }

@@ -17,34 +17,9 @@ class UsuarioController extends Controller
     {
         try {
             $usuarioModel = new Usuario();
-            $pacienteModel = new \App\Models\Paciente();
             
-            // Obtener usuarios de Firebase Auth
+            // Obtener todos los usuarios (ya incluyen pacientes y profesionales vinculados)
             $usuarios = $usuarioModel->all();
-            
-            // Obtener pacientes de la colección pacientes
-            $pacientes = $pacienteModel->all();
-            
-            // Convertir pacientes a formato de usuario
-            $pacientesComoUsuarios = array_map(function($paciente) {
-                return [
-                    'id' => $paciente['id'],
-                    'displayName' => $paciente['nombreCompleto'] ?? ($paciente['nombre'] ?? '') . ' ' . ($paciente['apellido'] ?? ''),
-                    'email' => $paciente['email'] ?? 'Sin email',
-                    'rol' => 'paciente',
-                    'activo' => $paciente['activo'] ?? true,
-                    'photoURL' => null,
-                    'telefono' => $paciente['telefono'] ?? null,
-                    'rut' => $paciente['rut'] ?? null,
-                    'ultimoAcceso' => null,
-                    'createdAt' => $paciente['createdAt'] ?? null,
-                    'idPaciente' => $paciente['id'], // Guardar referencia
-                    'esPacienteDirecto' => true, // Marcar como paciente de colección pacientes
-                ];
-            }, $pacientes);
-            
-            // Combinar usuarios y pacientes
-            $todosLosUsuarios = array_merge($usuarios, $pacientesComoUsuarios);
 
             // Aplicar filtros
             $rol = $request->get('rol');
@@ -53,7 +28,7 @@ class UsuarioController extends Controller
 
             // Filtrar por rol
             if ($rol && $rol !== 'todos') {
-                $todosLosUsuarios = array_filter($todosLosUsuarios, function($usuario) use ($rol) {
+                $usuarios = array_filter($usuarios, function($usuario) use ($rol) {
                     return isset($usuario['rol']) && $usuario['rol'] === $rol;
                 });
             }
@@ -61,7 +36,7 @@ class UsuarioController extends Controller
             // Filtrar por estado
             if ($estado !== null && $estado !== 'todos') {
                 $activo = $estado === 'activo';
-                $todosLosUsuarios = array_filter($todosLosUsuarios, function($usuario) use ($activo) {
+                $usuarios = array_filter($usuarios, function($usuario) use ($activo) {
                     return isset($usuario['activo']) && $usuario['activo'] === $activo;
                 });
             }
@@ -69,7 +44,7 @@ class UsuarioController extends Controller
             // Filtrar por búsqueda (nombre, email o RUT)
             if ($busqueda) {
                 $busquedaLower = strtolower($busqueda);
-                $todosLosUsuarios = array_filter($todosLosUsuarios, function($usuario) use ($busquedaLower) {
+                $usuarios = array_filter($usuarios, function($usuario) use ($busquedaLower) {
                     $nombre = strtolower($usuario['displayName'] ?? '');
                     $email = strtolower($usuario['email'] ?? '');
                     $rut = strtolower($usuario['rut'] ?? '');
@@ -80,10 +55,10 @@ class UsuarioController extends Controller
             }
 
             // Re-indexar array después de filtros
-            $todosLosUsuarios = array_values($todosLosUsuarios);
+            $usuarios = array_values($usuarios);
 
             // Ordenar por fecha de creación (más recientes primero)
-            usort($todosLosUsuarios, function($a, $b) {
+            usort($usuarios, function($a, $b) {
                 $dateA = $a['createdAt'] ?? null;
                 $dateB = $b['createdAt'] ?? null;
                 
@@ -107,9 +82,8 @@ class UsuarioController extends Controller
                     'createdAt' => $usuario['createdAt'] ?? null,
                     'idPaciente' => $usuario['idPaciente'] ?? null,
                     'idProfesional' => $usuario['idProfesional'] ?? null,
-                    'esPacienteDirecto' => $usuario['esPacienteDirecto'] ?? false,
                 ];
-            }, $todosLosUsuarios);
+            }, $usuarios);
 
             return Inertia::render('Usuarios/Index', [
                 'usuarios' => $usuariosFormateados,
@@ -149,6 +123,192 @@ class UsuarioController extends Controller
     }
 
     /**
+     * Mostrar formulario de creación de usuario
+     */
+    public function create()
+    {
+        return Inertia::render('Usuarios/Create');
+    }
+
+    /**
+     * Crear un nuevo usuario
+     */
+    public function store(Request $request)
+    {
+        // Validar datos del formulario
+        $validated = $request->validate([
+            'displayName' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'rut' => 'required|string|max:12',
+            'telefono' => 'nullable|string|max:20',
+            'rol' => 'required|in:admin,profesional,paciente',
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'displayName.required' => 'El nombre completo es obligatorio',
+            'email.required' => 'El email es obligatorio',
+            'email.email' => 'El email debe ser válido',
+            'rut.required' => 'El RUT es obligatorio',
+            'rol.required' => 'El rol es obligatorio',
+            'rol.in' => 'El rol debe ser: admin, profesional o paciente',
+            'password.required' => 'La contraseña es obligatoria',
+            'password.min' => 'La contraseña debe tener al menos 6 caracteres',
+            'password.confirmed' => 'Las contraseñas no coinciden',
+        ]);
+
+        try {
+            logger()->info('🔵 Iniciando creación de usuario', ['email' => $validated['email']]);
+
+            // Verificar que el email no esté en uso
+            $usuarioModel = new Usuario();
+            $emailExiste = $usuarioModel->findByEmail($validated['email']);
+            
+            if ($emailExiste) {
+                logger()->warning('⚠️ Email ya registrado', ['email' => $validated['email']]);
+                return back()
+                    ->withErrors(['email' => 'Este email ya está registrado'])
+                    ->withInput();
+            }
+
+            // Verificar que el RUT no esté en uso
+            $usuarios = $usuarioModel->all();
+            $rutExiste = collect($usuarios)->first(function($usuario) use ($validated) {
+                return isset($usuario['rut']) && $usuario['rut'] === $validated['rut'];
+            });
+
+            if ($rutExiste) {
+                logger()->warning('⚠️ RUT ya registrado', ['rut' => $validated['rut']]);
+                return back()
+                    ->withErrors(['rut' => 'Este RUT ya está registrado'])
+                    ->withInput();
+            }
+
+            // Crear usuario en Firebase Auth
+            logger()->info('📝 Creando usuario en Firebase Auth');
+            $auth = app(FirebaseAuth::class);
+            
+            $userProperties = [
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+                'displayName' => $validated['displayName'],
+                'emailVerified' => false,
+            ];
+
+            $firebaseUser = $auth->createUser($userProperties);
+            $uid = $firebaseUser->uid;
+
+            logger()->info('✅ Usuario creado en Firebase Auth', ['uid' => $uid]);
+
+            // Crear documento en Firestore (usuarios)
+            logger()->info('📝 Creando documento en Firestore');
+            
+            $usuarioData = [
+                'id' => $uid,
+                'displayName' => $validated['displayName'],
+                'email' => $validated['email'],
+                'rut' => $validated['rut'],
+                'telefono' => $validated['telefono'] ?? null,
+                'rol' => $validated['rol'],
+                'activo' => true,
+                'photoURL' => null,
+                'emailVerified' => false,
+                'createdAt' => now()->toISOString(),
+                'updatedAt' => now()->toISOString(),
+            ];
+
+            $firestore = app(Firestore::class);
+            $firestore->database()
+                ->collection('usuarios')
+                ->document($uid)
+                ->set($usuarioData);
+
+            logger()->info('✅ Usuario creado en Firestore', ['uid' => $uid]);
+
+            // Si el rol es paciente o profesional, crear registro vinculado
+            if ($validated['rol'] === 'paciente') {
+                logger()->info('📝 Creando registro de paciente vinculado');
+                
+                $pacienteRef = $firestore->database()->collection('pacientes')->newDocument();
+                $pacienteId = $pacienteRef->id();
+                
+                $pacienteData = [
+                    'id' => $pacienteId,
+                    'idUsuario' => $uid,
+                    'createdAt' => now()->toISOString(),
+                    'updatedAt' => now()->toISOString(),
+                ];
+
+                $pacienteRef->set($pacienteData);
+
+                // Actualizar usuario con idPaciente
+                $firestore->database()
+                    ->collection('usuarios')
+                    ->document($uid)
+                    ->update([
+                        ['path' => 'idPaciente', 'value' => $pacienteId],
+                        ['path' => 'updatedAt', 'value' => now()->toISOString()],
+                    ]);
+
+                logger()->info('✅ Registro de paciente creado', ['idPaciente' => $pacienteId]);
+            } elseif ($validated['rol'] === 'profesional') {
+                logger()->info('📝 Creando registro de profesional vinculado');
+                
+                $profesionalRef = $firestore->database()->collection('profesionales')->newDocument();
+                $profesionalId = $profesionalRef->id();
+                
+                $profesionalData = [
+                    'id' => $profesionalId,
+                    'idUsuario' => $uid,
+                    'createdAt' => now()->toISOString(),
+                    'updatedAt' => now()->toISOString(),
+                ];
+
+                $profesionalRef->set($profesionalData);
+
+                // Actualizar usuario con idProfesional
+                $firestore->database()
+                    ->collection('usuarios')
+                    ->document($uid)
+                    ->update([
+                        ['path' => 'idProfesional', 'value' => $profesionalId],
+                        ['path' => 'updatedAt', 'value' => now()->toISOString()],
+                    ]);
+
+                logger()->info('✅ Registro de profesional creado', ['idProfesional' => $profesionalId]);
+            }
+
+            logger()->info('🎉 Usuario creado exitosamente', [
+                'uid' => $uid,
+                'email' => $validated['email'],
+                'rol' => $validated['rol']
+            ]);
+
+            return redirect()
+                ->route('usuarios.show', $uid)
+                ->with('success', "Usuario {$validated['displayName']} creado exitosamente");
+
+        } catch (\Kreait\Firebase\Exception\Auth\EmailExists $e) {
+            logger()->error('❌ Email ya existe en Firebase Auth', [
+                'email' => $validated['email'],
+                'error' => $e->getMessage()
+            ]);
+            
+            return back()
+                ->withErrors(['email' => 'Este email ya está registrado en Firebase'])
+                ->withInput();
+        } catch (\Exception $e) {
+            logger()->error('❌ Error creando usuario', [
+                'email' => $validated['email'] ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return back()
+                ->with('error', 'Error al crear usuario: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
      * Mostrar un usuario específico
      */
     public function show(string $id)
@@ -157,31 +317,9 @@ class UsuarioController extends Controller
             $usuarioModel = new Usuario();
             $usuario = $usuarioModel->find($id);
 
-            // Si no se encuentra en usuarios, buscar en pacientes
             if (!$usuario) {
-                $pacienteModel = new \App\Models\Paciente();
-                $paciente = $pacienteModel->find($id);
-                
-                if ($paciente) {
-                    // Convertir paciente a formato usuario
-                    $usuario = [
-                        'id' => $paciente['id'],
-                        'displayName' => $paciente['nombreCompleto'] ?? ($paciente['nombre'] ?? '') . ' ' . ($paciente['apellido'] ?? ''),
-                        'email' => $paciente['email'] ?? '',
-                        'rol' => 'paciente',
-                        'activo' => $paciente['activo'] ?? true,
-                        'photoURL' => null,
-                        'telefono' => $paciente['telefono'] ?? null,
-                        'rut' => $paciente['rut'] ?? null,
-                        'ultimoAcceso' => null,
-                        'createdAt' => $paciente['createdAt'] ?? null,
-                        'idPaciente' => $paciente['id'],
-                        'esPacienteDirecto' => true,
-                    ];
-                } else {
-                    return redirect()->route('usuarios.index')
-                        ->with('error', 'Usuario no encontrado');
-                }
+                return redirect()->route('usuarios.index')
+                    ->with('error', 'Usuario no encontrado');
             }
 
             // Obtener permisos del usuario desde la colección permisos-usuario
@@ -218,56 +356,17 @@ class UsuarioController extends Controller
             logger()->info("🟢 Iniciando update() para usuario {$id}", ['validated' => $validated]);
             
             $usuarioModel = new Usuario();
-            $pacienteModel = new \App\Models\Paciente();
             $usuarioActual = $usuarioModel->find($id);
             
-            // Si no existe en usuarios, verificar en pacientes
-            $esPacienteDirecto = false;
             if (!$usuarioActual) {
-                $pacienteActual = $pacienteModel->find($id);
-                if ($pacienteActual) {
-                    $esPacienteDirecto = true;
-                    logger()->info("📋 Paciente encontrado en colección pacientes", ['id' => $id]);
-                } else {
-                    return back()->with('error', 'Usuario/Paciente no encontrado');
-                }
-            } else {
-                logger()->info("📋 Usuario actual obtenido", [
-                    'id' => $id,
-                    'email_actual' => $usuarioActual['email'] ?? null,
-                    'displayName_actual' => $usuarioActual['displayName'] ?? null
-                ]);
+                return back()->with('error', 'Usuario no encontrado');
             }
-            
-            // Si es un paciente directo, actualizar en colección pacientes
-            if ($esPacienteDirecto) {
-                $dataPaciente = [];
-                
-                // Mapear campos de usuario a paciente
-                if (isset($validated['displayName'])) {
-                    $partes = explode(' ', $validated['displayName'], 2);
-                    $dataPaciente['nombre'] = $partes[0] ?? '';
-                    $dataPaciente['apellido'] = $partes[1] ?? '';
-                    $dataPaciente['nombreCompleto'] = $validated['displayName'];
-                }
-                if (isset($validated['email'])) $dataPaciente['email'] = $validated['email'];
-                if (isset($validated['telefono'])) $dataPaciente['telefono'] = $validated['telefono'];
-                if (isset($validated['rut'])) $dataPaciente['rut'] = $validated['rut'];
-                if (isset($validated['activo'])) $dataPaciente['activo'] = $validated['activo'];
-                
-                $pacienteModel->update($id, $dataPaciente);
-                
-                $cambios = [];
-                if (isset($validated['displayName'])) $cambios[] = 'nombre';
-                if (isset($validated['email'])) $cambios[] = 'correo';
-                if (isset($validated['telefono'])) $cambios[] = 'teléfono';
-                if (isset($validated['rut'])) $cambios[] = 'RUT';
-                
-                $mensajeCambios = count($cambios) > 0 ? ' (' . implode(', ', $cambios) . ')' : '';
-                
-                logger()->info("🎉 Paciente {$id} actualizado completamente", ['cambios' => $cambios]);
-                return back()->with('success', 'Paciente actualizado correctamente' . $mensajeCambios);
-            }
+
+            logger()->info("📋 Usuario actual obtenido", [
+                'id' => $id,
+                'email_actual' => $usuarioActual['email'] ?? null,
+                'displayName_actual' => $usuarioActual['displayName'] ?? null
+            ]);
             
             // Verificar si el email ya está en uso por otro usuario
             if (isset($validated['email']) && $validated['email'] !== $usuarioActual['email']) {
@@ -468,44 +567,26 @@ class UsuarioController extends Controller
     {
         try {
             $usuarioModel = new Usuario();
-            $pacienteModel = new \App\Models\Paciente();
             $usuario = $usuarioModel->find($id);
 
-            // Si no existe en usuarios, verificar en pacientes
-            $esPacienteDirecto = false;
             if (!$usuario) {
-                $paciente = $pacienteModel->find($id);
-                if ($paciente) {
-                    $esPacienteDirecto = true;
-                    $usuario = [
-                        'id' => $paciente['id'],
-                        'displayName' => $paciente['nombreCompleto'] ?? 'Paciente',
-                        'activo' => $paciente['activo'] ?? true,
-                    ];
-                } else {
-                    return back()->with('error', 'Usuario/Paciente no encontrado');
-                }
+                return back()->with('error', 'Usuario no encontrado');
             }
 
             $nuevoEstado = !($usuario['activo'] ?? false);
             
-            if ($esPacienteDirecto) {
-                // Actualizar solo en colección pacientes
-                $pacienteModel->update($id, ['activo' => $nuevoEstado]);
-            } else {
-                // Actualizar en Firestore
-                $usuarioModel->update($id, ['activo' => $nuevoEstado]);
+            // Actualizar en Firestore
+            $usuarioModel->update($id, ['activo' => $nuevoEstado]);
 
-                // Actualizar en Firebase Auth (disabled es lo opuesto de activo)
-                try {
-                    $auth = app(FirebaseAuth::class);
-                    $auth->updateUser($id, [
-                        'disabled' => !$nuevoEstado,
-                    ]);
-                } catch (\Exception $authError) {
-                    logger()->warning("No se pudo actualizar estado en Firebase Auth: " . $authError->getMessage());
-                    // Continuar aunque falle Firebase Auth
-                }
+            // Actualizar en Firebase Auth (disabled es lo opuesto de activo)
+            try {
+                $auth = app(FirebaseAuth::class);
+                $auth->updateUser($id, [
+                    'disabled' => !$nuevoEstado,
+                ]);
+            } catch (\Exception $authError) {
+                logger()->warning("No se pudo actualizar estado en Firebase Auth: " . $authError->getMessage());
+                // Continuar aunque falle Firebase Auth
             }
 
             $nombreUsuario = $usuario['displayName'] ?? 'Usuario';
@@ -527,25 +608,10 @@ class UsuarioController extends Controller
     {
         try {
             $usuarioModel = new Usuario();
-            $pacienteModel = new \App\Models\Paciente();
             $usuario = $usuarioModel->find($id);
             
-            // Si no existe en usuarios, verificar en pacientes
-            $esPacienteDirecto = false;
             if (!$usuario) {
-                $paciente = $pacienteModel->find($id);
-                if ($paciente) {
-                    $esPacienteDirecto = true;
-                    $nombreUsuario = $paciente['nombreCompleto'] ?? 'Paciente';
-                    
-                    // Eliminar solo de colección pacientes
-                    $pacienteModel->delete($id);
-                    
-                    return redirect()->route('usuarios.index')
-                        ->with('success', "Paciente {$nombreUsuario} eliminado permanentemente");
-                } else {
-                    return back()->with('error', 'Usuario/Paciente no encontrado');
-                }
+                return back()->with('error', 'Usuario no encontrado');
             }
             
             $nombreUsuario = $usuario['displayName'] ?? 'Usuario';
