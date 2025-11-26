@@ -21,6 +21,7 @@ import { FichasMedicasService } from '../../fichas-medicas/data/fichas-medicas.s
 import { ConsultasService } from '../data/consultas.service';
 import { ExamenesService } from '../../examenes/data/examenes.service';
 import { OcrService } from '../../../services/ocr.service';
+import { NotasService } from '../data/notas.service';
 
 // Components
 import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/nueva-consulta-modal.component';
@@ -31,6 +32,7 @@ import { Paciente } from '../../../models/paciente.model';
 import { FichaMedica } from '../../../models/ficha-medica.model';
 import { Consulta } from '../../../models/consulta.model';
 import { OrdenExamen } from '../../../models/orden-examen.model';
+import { Nota } from '../../../models/nota.model';
 
 // Utilidades
 import { AvatarUtils } from '../../../shared/utils/avatar.utils';
@@ -114,9 +116,6 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Modal state guard - prevents multiple opens
   private isModalOpen = false;
   
-  // Variable para las notas rápidas
-  nuevaNota: string = '';
-  
   // Popup de Subir Examen
   showExamenPopup = false;
   nuevoExamen = {
@@ -133,6 +132,16 @@ export class ConsultasPage implements OnInit, OnDestroy {
   
   // Órdenes de exámenes
   ordenesExamenes: OrdenExamen[] = [];
+  
+  // Notas del paciente
+  notas: Nota[] = [];
+  showNotaPopup = false;
+  datosNuevaNota = {
+    contenido: '',
+    tipoAsociacion: null as 'consulta' | 'examen' | 'orden' | null,
+    idAsociado: '',
+    nombreAsociado: ''
+  };
   
   // Estado de edición de texto OCR
   editandoTexto = false;
@@ -190,6 +199,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   private consultasService = inject(ConsultasService);
   private examenesService = inject(ExamenesService);
   private ocrService = inject(OcrService);
+  private notasService = inject(NotasService);
   private modalCtrl = inject(ModalController);
   private toastCtrl = inject(ToastController);
   private document = inject(DOCUMENT);
@@ -235,7 +245,6 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.ficha = null;
     this.fichaId = null;
     this.timelineItems = [];
-    this.nuevaNota = '';
     this.isEditMode = false;
     this.editedData = {};
     this.error = null;
@@ -282,6 +291,9 @@ export class ConsultasPage implements OnInit, OnDestroy {
       
       // Cargar órdenes de exámenes
       await this.cargarOrdenesExamenes();
+      
+      // Cargar notas
+      await this.cargarNotas();
 
       this.isLoading = false;
     } catch (error: any) {
@@ -786,6 +798,204 @@ export class ConsultasPage implements OnInit, OnDestroy {
   getFechaOrden(fecha: Date | Timestamp): Date {
     return fecha instanceof Timestamp ? fecha.toDate() : fecha;
   }
+  
+  // ========== NOTAS ==========
+  
+  /**
+   * Cargar notas del paciente
+   */
+  async cargarNotas() {
+    try {
+      if (!this.patientId) {
+        console.log('⚠️ No hay patientId para cargar notas');
+        return;
+      }
+      
+      console.log('📝 Cargando notas para paciente:', this.patientId);
+      this.notas = await this.notasService.getNotasByPaciente(this.patientId);
+      console.log('✅ Notas cargadas:', this.notas.length, this.notas);
+    } catch (error) {
+      console.error('❌ Error al cargar notas:', error);
+    }
+  }
+  
+  /**
+   * Abrir popup para nueva nota
+   */
+  nuevaNota() {
+    this.showNotaPopup = true;
+    this.datosNuevaNota = {
+      contenido: '',
+      tipoAsociacion: null,
+      idAsociado: '',
+      nombreAsociado: ''
+    };
+  }
+  
+  /**
+   * Cerrar popup de nota
+   */
+  cerrarPopupNota() {
+    this.showNotaPopup = false;
+    this.datosNuevaNota = {
+      contenido: '',
+      tipoAsociacion: null,
+      idAsociado: '',
+      nombreAsociado: ''
+    };
+  }
+  
+  /**
+   * Guardar nueva nota
+   */
+  async guardarNota() {
+    console.log('💾 Guardando nota:', this.datosNuevaNota);
+    
+    if (!this.datosNuevaNota.contenido.trim()) {
+      const toast = await this.toastCtrl.create({
+        message: 'El contenido de la nota no puede estar vacío',
+        duration: 2000,
+        color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+
+    try {
+      this.isLoading = true;
+
+      const nota: Omit<Nota, 'id'> = {
+        idPaciente: this.patientId!,
+        idProfesional: 'system', // Aquí deberías poner el ID del usuario actual
+        contenido: this.datosNuevaNota.contenido,
+        fecha: Timestamp.now(),
+        tipoAsociacion: this.datosNuevaNota.tipoAsociacion,
+        idAsociado: this.datosNuevaNota.idAsociado || undefined,
+        nombreAsociado: this.datosNuevaNota.nombreAsociado || undefined
+      };
+
+      console.log('📤 Enviando nota a Firestore:', nota);
+      const idNota = await this.notasService.createNota(nota);
+      console.log('✅ Nota guardada con ID:', idNota);
+
+      const toast = await this.toastCtrl.create({
+        message: 'Nota guardada exitosamente',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+
+      this.cerrarPopupNota();
+      await this.cargarNotas();
+      
+    } catch (error) {
+      console.error('❌ Error al guardar nota:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al guardar la nota',
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+  
+  /**
+   * Eliminar una nota
+   */
+  async eliminarNota(nota: Nota) {
+    try {
+      if (!nota.id) return;
+      
+      await this.notasService.deleteNota(nota.id);
+      
+      const toast = await this.toastCtrl.create({
+        message: 'Nota eliminada',
+        duration: 2000,
+        color: 'success'
+      });
+      await toast.present();
+      
+      await this.cargarNotas();
+    } catch (error) {
+      console.error('Error al eliminar nota:', error);
+      const toast = await this.toastCtrl.create({
+        message: 'Error al eliminar la nota',
+        duration: 3000,
+        color: 'danger'
+      });
+      await toast.present();
+    }
+  }
+  
+  /**
+   * Obtener opciones de asociación para el select
+   */
+  getOpcionesAsociacion(): { id: string, nombre: string, tipo: 'consulta' | 'examen' | 'orden' }[] {
+    const opciones: { id: string, nombre: string, tipo: 'consulta' | 'examen' | 'orden' }[] = [];
+    
+    console.log('🔍 Generando opciones de asociación...');
+    console.log('Consultas disponibles:', this.ficha?.consultas?.length || 0);
+    console.log('Órdenes disponibles:', this.ordenesExamenes?.length || 0);
+    
+    // Agregar consultas
+    if (this.ficha?.consultas) {
+      this.ficha.consultas.forEach(consulta => {
+        if (consulta.id) {
+          const opcion = {
+            id: consulta.id,
+            nombre: `Consulta - ${this.formatDateShort(consulta.fecha)} - ${consulta.motivo || 'Sin motivo'}`,
+            tipo: 'consulta' as const
+          };
+          opciones.push(opcion);
+          console.log('  ✓ Agregada consulta:', opcion.nombre);
+        }
+      });
+    }
+    
+    // Agregar órdenes de exámenes
+    if (this.ordenesExamenes) {
+      this.ordenesExamenes.forEach(orden => {
+        if (orden.id) {
+          const fecha = orden.fecha instanceof Timestamp ? orden.fecha.toDate() : orden.fecha;
+          const opcion = {
+            id: orden.id,
+            nombre: `Orden - ${this.formatDateShort(fecha)} - ${orden.examenes.length} exámenes`,
+            tipo: 'orden' as const
+          };
+          opciones.push(opcion);
+          console.log('  ✓ Agregada orden:', opcion.nombre);
+        }
+      });
+    }
+    
+    console.log('📋 Total opciones generadas:', opciones.length);
+    return opciones;
+  }
+  
+  /**
+   * Actualizar asociación de nota cuando se selecciona
+   */
+  onAsociacionChange(event: any) {
+    const valorSeleccionado = event.detail.value;
+    
+    if (!valorSeleccionado) {
+      this.datosNuevaNota.tipoAsociacion = null;
+      this.datosNuevaNota.idAsociado = '';
+      this.datosNuevaNota.nombreAsociado = '';
+      return;
+    }
+    
+    const opciones = this.getOpcionesAsociacion();
+    const opcion = opciones.find(o => `${o.tipo}-${o.id}` === valorSeleccionado);
+    
+    if (opcion) {
+      this.datosNuevaNota.tipoAsociacion = opcion.tipo;
+      this.datosNuevaNota.idAsociado = opcion.id;
+      this.datosNuevaNota.nombreAsociado = opcion.nombre;
+    }
+  }
 
   estadoExamenColor(estado: string): string {
     switch (estado) {
@@ -946,36 +1156,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
       .slice(0, 10); // HARD LIMIT: Max 10 timeline items
   }
 
-  // ============== NOTAS RÁPIDAS ==============
-  async guardarNota() {
-    if (!this.nuevaNota.trim() || !this.patientId || !this.fichaId) return;
-    
-    try {
-      // Get the most recent consultation to add note to
-      const consultas = await this.consultasService.getConsultasByPaciente(this.patientId).toPromise();
-      
-      if (consultas && consultas.length > 0) {
-        const consultaId = consultas[0].id!;
-        await this.consultasService.addNotaRapida(consultaId, {
-          texto: this.nuevaNota.trim(),
-          autor: 'medico-general' // TODO: Get from auth
-        });
-        this.nuevaNota = '';
-        this.refreshData();
-      } else {
-        // Si no hay consultas, crear una nueva solo para la nota
-        await this.nuevaConsulta();
-        // Note will be added after consultation is created
-      }
-    } catch (error) {
-      console.error('Error guardando nota:', error);
-      this.error = 'Error al guardar la nota';
-    }
-  }
-
-  agregarNota() {
-    this.guardarNota();
-  }
+  // ============== SUBIR EXÁMENES ==============
   
   /**
    * Abrir popup para subir examen (CSS overlay, no ModalController)

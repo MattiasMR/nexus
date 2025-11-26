@@ -349,33 +349,95 @@
     <ion-card class="section-card">
       <ion-card-header>
         <div class="section-header">
-          <ion-icon name="document-outline" class="section-icon notas-icon"></ion-icon>
-          <ion-card-title>Notas Rápidas</ion-card-title>
+          <ion-icon name="document-text" class="section-icon notas-icon"></ion-icon>
+          <ion-card-title>Notas</ion-card-title>
+          <ion-badge color="primary">{{ notas.length }}</ion-badge>
+          <ion-button (click)="nuevaNota()" fill="solid" size="small" class="nueva-nota-btn">
+            <ion-icon name="add" slot="start"></ion-icon>
+            Nueva Nota
+          </ion-button>
         </div>
       </ion-card-header>
       
       <ion-card-content>
-        <div class="notas-container">
-          <ion-textarea
-            [(ngModel)]="nuevaNota"
-            placeholder="Agregar nota rápida sobre el paciente..."
-            rows="4"
-            fill="outline"
-            class="nota-textarea">
-          </ion-textarea>
-          
-          <ion-button 
-            (click)="agregarNota()"
-            [disabled]="!nuevaNota.trim()"
-            color="primary"
-            class="agregar-nota-btn">
-            <ion-icon name="add" slot="start"></ion-icon>
-            Agregar Nota
-          </ion-button>
+        <div *ngIf="notas.length === 0" class="empty-state">
+          <ion-icon name="document-text-outline" style="font-size: 64px; color: #ccc;"></ion-icon>
+          <p style="color: #999; margin-top: 16px;">No hay notas registradas</p>
+          <p style="color: #999; font-size: 0.9rem;">Usa el botón "Nueva Nota" para agregar una</p>
+        </div>
+        
+        <div class="notas-list" *ngIf="notas.length > 0">
+          <div *ngFor="let nota of notas" class="nota-card">
+            <div class="nota-header">
+              <div class="nota-fecha">
+                <ion-icon name="calendar"></ion-icon>
+                <span>{{ getFechaOrden(nota.fecha) | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <button class="icon-btn delete-btn" (click)="eliminarNota(nota)" title="Eliminar nota">
+                <ion-icon name="trash"></ion-icon>
+              </button>
+            </div>
+            
+            <div class="nota-contenido">
+              <p>{{ nota.contenido }}</p>
+            </div>
+            
+            <div class="nota-footer" *ngIf="nota.tipoAsociacion && nota.nombreAsociado">
+              <ion-badge [color]="nota.tipoAsociacion === 'consulta' ? 'primary' : nota.tipoAsociacion === 'orden' ? 'secondary' : 'tertiary'">
+                <ion-icon [name]="nota.tipoAsociacion === 'consulta' ? 'medical' : nota.tipoAsociacion === 'orden' ? 'flask' : 'document'"></ion-icon>
+                {{ nota.nombreAsociado }}
+              </ion-badge>
+            </div>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>
 
+  </div>
+
+  <!-- Popup para Nueva Nota -->
+  <div *ngIf="showNotaPopup" class="popup-overlay" (click)="cerrarPopupNota()">
+    <div class="popup-content" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Nueva Nota</h2>
+        <button class="close-btn" (click)="cerrarPopupNota()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <p class="patient-info">Paciente: {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</p>
+        
+        <div class="form-group">
+          <label for="contenidoNota">Contenido de la Nota *</label>
+          <textarea 
+            id="contenidoNota"
+            [(ngModel)]="datosNuevaNota.contenido"
+            placeholder="Escribe aquí la nota..."
+            rows="6"
+            class="form-input"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="asociacionNota">Asociar con (Opcional)</label>
+          <ion-select 
+            interface="action-sheet"
+            placeholder="Selecciona una consulta u orden"
+            (ionChange)="onAsociacionChange($event)"
+            class="form-input">
+            <ion-select-option value="">Sin asociar</ion-select-option>
+            <ion-select-option *ngFor="let opcion of getOpcionesAsociacion()" [value]="opcion.tipo + '-' + opcion.id">
+              {{ opcion.nombre }}
+            </ion-select-option>
+          </ion-select>
+        </div>
+      </div>
+
+      <div class="popup-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarPopupNota()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarNota()">Guardar Nota</button>
+      </div>
+    </div>
   </div>
 
   <!-- Popup para Nueva Consulta -->
