@@ -23,37 +23,57 @@ Sistema médico multi-tenant con autenticación unificada para pacientes (Ionic)
 
 ## 🗂️ Colecciones de Firestore
 
-### 🆕 1. **usuarios** (Colección Raíz - AUTENTICACIÓN)
-**Descripción**: Usuarios del sistema con autenticación unificada.
+### ✅ 1. **usuarios** (Colección Raíz - AUTENTICACIÓN) - IMPLEMENTADO
+**Descripción**: Usuarios del sistema con autenticación unificada vía Firebase Authentication.
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `id` | string | Auto | UID de Firebase Auth |
+| `id` | string | Auto | UID de Firebase Auth (usado como document ID) |
 | `email` | string | ✅ | Email único (login) |
 | `displayName` | string | ✅ | Nombre completo del usuario |
-| `rol` | string | ✅ | 'paciente', 'medico', 'admin', 'super_admin' |
-| `activo` | boolean | ✅ | Usuario activo/inactivo |
+| `rol` | string | ✅ | 'paciente', 'profesional', 'admin', 'super_admin' |
+| `activo` | boolean | ✅ | Usuario activo/inactivo (default: true) |
 | `photoURL` | string | ❌ | URL foto de perfil |
 | `telefono` | string | ❌ | Teléfono de contacto |
 | `idPaciente` | string | ❌ | ID si es paciente (relación 1:1) |
-| `idProfesional` | string | ❌ | ID si es médico (relación 1:1) |
-| `hospitalesAsignados` | string[] | ❌ | IDs de hospitales (para médicos/admins) |
-| `especialidades` | string[] | ❌ | Especialidades (solo médicos) |
+| `idProfesional` | string | ❌ | ID si es profesional médico (relación 1:1) |
 | `ultimoAcceso` | Timestamp | Auto | Última vez que inició sesión |
 | `createdAt` | Timestamp | Auto | Fecha de creación |
 | `updatedAt` | Timestamp | Auto | Última actualización |
 
+**Implementación**:
+- ✅ Modelo Laravel: `app/Models/Usuario.php`
+- ✅ Seeder: `database/seeders/FirebaseAuthSeeder.php`
+- ✅ 6 usuarios de prueba creados (2 admin, 2 profesional, 2 paciente)
+- ✅ Sincronización Firebase Auth ↔ Firestore
+- ✅ UIDs de Firebase Auth usados como document IDs
+
 **Índices**:
-- `email` (único)
-- `rol` + `activo` (compuesto)
+- `email` (único - gestionado por Firebase Auth)
+- `rol` + `activo` (compuesto - para queries)
 - `idPaciente` (único cuando no es null)
 - `idProfesional` (único cuando no es null)
 
-**Reglas de Validación**:
+**Reglas de Validación Implementadas**:
 - Si `rol === 'paciente'`: `idPaciente` es requerido
-- Si `rol === 'medico'`: `idProfesional` es requerido, `hospitalesAsignados` al menos 1
-- Si `rol === 'admin'`: `hospitalesAsignados` debe tener exactamente 1 elemento
-- Si `rol === 'super_admin'`: No tiene restricciones de hospital
+- Email debe ser único (validado en Firebase Auth)
+- Un paciente solo puede tener un usuario asociado
+- Las contraseñas se gestionan en Firebase Auth (no en Firestore)
+
+**Usuarios de Prueba Creados**:
+```
+ADMIN:
+- admin1@nexus.cl / Admin123!
+- admin2@nexus.cl / Admin123!
+
+PROFESIONAL:
+- dr.gonzalez@nexus.cl / Prof123!
+- dra.martinez@nexus.cl / Prof123!
+
+PACIENTE:
+- juan.perez@email.com / Pac123! (idPaciente: Fh2byylkEBfJCxd2vD1P)
+- maria.lopez@email.com / Pac123! (idPaciente: SUso7Nyhb18whZ21Z2Ux)
+```
 
 ---
 
@@ -98,50 +118,65 @@ Sistema médico multi-tenant con autenticación unificada para pacientes (Ionic)
 
 ---
 
-### 🆕 3. **permisos-usuario** (Colección Raíz)
-**Descripción**: Permisos granulares por usuario y recurso.
+### ✅ 3. **permisos-usuario** (Colección Raíz) - IMPLEMENTADO
+**Descripción**: Permisos granulares por usuario y hospital.
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
 | `id` | string | Auto | ID del documento |
-| `idUsuario` | string | ✅ | Referencia a usuarios |
+| `idUsuario` | string | ✅ | Referencia a usuarios (Firebase UID) |
 | `idHospital` | string | ✅ | Hospital donde aplica el permiso |
-| `permisos` | string[] | ✅ | Lista de permisos |
+| `permisos` | string[] | ✅ | Lista de permisos otorgados |
 | `fechaInicio` | Timestamp | ✅ | Desde cuando es válido |
-| `fechaFin` | Timestamp | ❌ | Hasta cuando es válido |
+| `fechaFin` | Timestamp | ❌ | Hasta cuando es válido (null = permanente) |
 | `createdAt` | Timestamp | Auto | Fecha de creación |
 | `updatedAt` | Timestamp | Auto | Última actualización |
 
-**Permisos Disponibles**:
-```typescript
-// Para Médicos (Flutter)
+**Implementación**:
+- ✅ Modelo Laravel: `app/Models/PermisoUsuario.php`
+- ✅ Constantes de permisos definidas por rol
+- ✅ Seeder automático (crea permisos junto con usuarios)
+- ✅ Métodos de validación: `hasPermission()`, `hasAnyPermission()`
+
+**Permisos Implementados**:
+```php
+// PERMISOS_ADMIN (Laravel - Administradores)
+'gestionar_usuarios'
+'gestionar_profesionales'
+'gestionar_pacientes'
+'gestionar_examenes_catalogo'
+'gestionar_medicamentos_catalogo'
+'configurar_hospital'
+'ver_reportes'
+
+// PERMISOS_PROFESIONAL (Ionic/Flutter - Médicos)
 'ver_pacientes'
 'crear_consultas'
 'editar_consultas'
 'ver_fichas_medicas'
 'editar_fichas_medicas'
 'crear_recetas'
+'editar_recetas'
 'solicitar_examenes'
 'ver_examenes'
+'hospitalizar_paciente'
+'editar_hospitalizacion'
 
-// Para Administradores (Laravel)
-'gestionar_usuarios'
-'gestionar_profesionales'
-'gestionar_pacientes'
-'ver_reportes'
-'configurar_hospital'
-'gestionar_examenes_catalogo'
-'gestionar_medicamentos_catalogo'
-
-// Para Super Admin (Laravel)
-'gestionar_hospitales'
-'gestionar_todos_usuarios'
-'acceso_total'
+// PERMISOS_PACIENTE (Ionic - Pacientes)
+'ver_mi_ficha'
+'ver_mis_consultas'
+'ver_mis_examenes'
+'ver_mis_recetas'
+'descargar_documentos'
+'comprar_bonos'
 ```
 
 **Índices**:
-- `idUsuario` + `idHospital` (compuesto)
-- `idHospital` (filtrado)
+- `idUsuario` + `idHospital` (compuesto - query principal)
+- `idHospital` (filtrado por hospital)
+
+**Permisos Asignados en Seeder**:
+- Todos los usuarios tienen permisos en hospital: `RSAlN3zsmWzeoY3z9GzN`
 
 ---
 
@@ -1011,45 +1046,52 @@ public function hasPermission($userId, $hospitalId, $permission)
 
 ## 📋 Plan de Migración
 
-### Fase 1: Preparación (Semana 1)
+### ✅ Fase 1: Preparación (Completada - Nov 2025)
 1. ✅ Actualizar `Modelo_BDD.md` con campos multi-tenant
-2. ⬜ Crear colecciones `usuarios`, `hospitales`, `permisos-usuario` en Firestore
-3. ⬜ Configurar Firebase Authentication en los 3 proyectos
-4. ⬜ Implementar custom claims en Firebase Auth
+2. ✅ Crear colecciones `usuarios`, `permisos-usuario` en Firestore
+3. ✅ Configurar Firebase Authentication en proyecto Laravel
+4. ✅ Crear 6 usuarios de prueba en Firebase Auth + Firestore
 
-### Fase 2: Backend Laravel (Semana 2)
-1. ⬜ Crear modelos Laravel para usuarios/hospitales/permisos
-2. ⬜ Implementar sincronización Laravel Auth ↔ Firebase Auth
-3. ⬜ Crear interfaces de gestión de usuarios
-4. ⬜ Implementar sistema de permisos granulares
-5. ⬜ Crear dashboard de administración
+### ✅ Fase 2: Backend Laravel (Completada - Nov 2025)
+1. ✅ Crear modelos Laravel para `Usuario` y `PermisoUsuario`
+2. ✅ Implementar sincronización Laravel Auth ↔ Firebase Auth
+   - FirebaseGuard personalizado (implements StatefulGuard)
+   - FirestoreUserProvider para carga de usuarios
+   - LoginController con validación de roles
+3. ✅ Implementar sistema de permisos granulares
+   - Constantes de permisos por rol
+   - Middleware CheckRole para protección de rutas
+4. ✅ Crear seeder automatizado (FirebaseAuthSeeder)
+5. ✅ Configurar rutas protegidas con autenticación + roles
+6. ✅ Página de login funcional (Auth/Login.vue)
 
-### Fase 3: Flutter App (Semana 3)
+### ⏳ Fase 3: Ionic App - Profesionales (Pendiente)
 1. ⬜ Implementar login con Firebase Auth
-2. ⬜ Agregar selector de hospital (si médico tiene múltiples)
-3. ⬜ Modificar queries para filtrar por hospital
-4. ⬜ Agregar campo `idHospital` a todas las operaciones de escritura
-5. ⬜ Implementar verificación de permisos antes de acciones
+2. ⬜ Integrar con colección `usuarios` (rol='profesional')
+3. ⬜ Verificar permisos desde `permisos-usuario`
+4. ⬜ Modificar queries para filtrar por hospital asignado
+5. ⬜ Agregar campo `idHospital` a todas las operaciones de escritura
 
-### Fase 4: Ionic App (Semana 4)
+### ⏳ Fase 4: Flutter App - Pacientes (Pendiente)
 1. ⬜ Implementar login con Firebase Auth
-2. ⬜ Modificar vistas para mostrar hospital de cada registro
-3. ⬜ Agregar filtros por hospital en historial
-4. ⬜ Modo solo lectura (sin ediciones)
+2. ⬜ Integrar con colección `usuarios` (rol='paciente')
+3. ⬜ Modo solo lectura (sin ediciones - solo permisos de visualización)
+4. ⬜ Mostrar historial médico de todos los hospitales
+5. ⬜ Funcionalidad de compra de bonos
 
-### Fase 5: Migración de Datos (Semana 5)
-1. ⬜ Script para crear hospital "default" para datos existentes
-2. ⬜ Script para agregar `idHospital` a registros existentes
-3. ⬜ Script para actualizar pacientes con `hospitalesAtendido`
-4. ⬜ Script para actualizar profesionales con `hospitalesAsignados`
-5. ⬜ Validar integridad de datos migrados
+### ⏳ Fase 5: Colección Hospitales (Pendiente)
+1. ⬜ Crear modelo `Hospital` en Laravel
+2. ⬜ Crear seeder con hospital por defecto (RSAlN3zsmWzeoY3z9GzN)
+3. ⬜ Agregar campo `idHospital` a colecciones transaccionales existentes
+4. ⬜ Script para actualizar pacientes con `hospitalesAtendido`
+5. ⬜ Interfaz de gestión de hospitales (solo super_admin)
 
-### Fase 6: Testing y Deployment (Semana 6)
-1. ⬜ Pruebas de seguridad (intentar acceder a datos de otros hospitales)
+### ⏳ Fase 6: Testing y Deployment (Pendiente)
+1. ⬜ Pruebas de autenticación en las 3 plataformas
 2. ⬜ Pruebas de permisos (verificar roles y restricciones)
-3. ⬜ Pruebas de performance (queries con filtros de hospital)
+3. ⬜ Validar sincronización Firebase Auth ↔ Firestore
 4. ⬜ Deploy de Security Rules en producción
-5. ⬜ Capacitación de usuarios
+5. ⬜ Documentación de usuario final
 
 ---
 
@@ -1132,5 +1174,38 @@ export const setUserClaims = functions.https.onCall(async (data, context) => {
 
 ---
 
-**Versión**: 2.0 - Multi-Tenant  
-**Fecha**: Enero 2025  
+## 🎯 Estado Actual de Implementación
+
+### ✅ Completado (Laravel - Admin)
+- **Autenticación Firebase**: Sistema completo con FirebaseGuard + FirestoreUserProvider
+- **Colecciones Firestore**:
+  - `usuarios`: 6 usuarios de prueba (2 admin, 2 profesional, 2 paciente)
+  - `permisos-usuario`: Permisos asignados por rol y hospital
+- **Modelos Laravel**:
+  - `Usuario`: CRUD completo con validaciones
+  - `PermisoUsuario`: Sistema de permisos granulares
+- **Autenticación Web**:
+  - LoginController con validación de roles
+  - Middleware CheckRole para protección de rutas
+  - Página Login.vue funcional en español
+- **Seeders**: FirebaseAuthSeeder automatizado
+- **Seguridad**: Solo admins pueden acceder a Laravel web
+
+### ⏳ Pendiente (Multi-plataforma)
+- Implementación Ionic (profesionales)
+- Implementación Flutter (pacientes)
+- Colección `hospitales` y modelo Hospital
+- Integración multi-tenant completa en todas las colecciones
+- Firestore Security Rules en producción
+- Custom Claims en Firebase Auth
+
+### 📌 Hospital por Defecto
+- **ID**: `RSAlN3zsmWzeoY3z9GzN`
+- **Uso**: Todos los permisos actuales están asignados a este hospital
+- **Migración**: Cuando se cree la colección `hospitales`, este será el primer registro
+
+---
+
+**Versión**: 2.1 - Multi-Tenant (Laravel Implementado)  
+**Fecha**: Noviembre 25, 2025  
+**Última Actualización**: Sistema de autenticación Laravel completado  

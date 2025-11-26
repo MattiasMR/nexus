@@ -38,21 +38,29 @@ class WebPayController extends Controller
     {
         $tiposBonos = \App\Models\Bono::tipos();
         
-        // Obtener todos los pacientes desde Firestore
-        $pacienteModel = new \App\Models\Paciente();
-        $pacientes = $pacienteModel->all();
+        // Obtener usuarios con rol paciente desde Firestore
+        $usuarioModel = new \App\Models\Usuario();
+        $todosUsuarios = $usuarioModel->all();
         
-        // Formatear pacientes para el select
+        // Filtrar solo pacientes
+        $pacientes = array_filter($todosUsuarios, function($usuario) {
+            return isset($usuario['rol']) && $usuario['rol'] === 'paciente';
+        });
+        
+        // Formatear pacientes para el select con búsqueda por nombre y RUT
         $pacientesFormateados = array_map(function($paciente) {
+            $nombre = $paciente['displayName'] ?? $paciente['email'] ?? 'Sin nombre';
+            $rut = $paciente['rut'] ?? 'Sin RUT';
+            
             return [
                 'id' => $paciente['id'],
-                'nombre' => $paciente['nombre'] ?? '',
+                'nombre' => $nombre,
                 'email' => $paciente['email'] ?? '',
-                'rut' => $paciente['rut'] ?? '',
+                'rut' => $rut,
                 'telefono' => $paciente['telefono'] ?? '',
-                'label' => ($paciente['nombre'] ?? 'Sin nombre') . ' - ' . ($paciente['rut'] ?? 'Sin RUT'),
+                'label' => $nombre . ' - ' . $rut,
             ];
-        }, $pacientes);
+        }, array_values($pacientes));
         
         return \Inertia\Inertia::render('ComprarBono', [
             'tiposBonos' => $tiposBonos,
