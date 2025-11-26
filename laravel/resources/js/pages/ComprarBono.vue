@@ -21,21 +21,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Head, useForm } from '@inertiajs/vue3';
-import { CreditCard, Calendar, DollarSign, Clock, CheckCircle2, User, Search } from 'lucide-vue-next';
+import { CreditCard, Calendar, DollarSign, Clock, CheckCircle2, User, Search, X } from 'lucide-vue-next';
 import { computed, watch, ref } from 'vue';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
 
 interface TipoBono {
     id: string;
@@ -70,34 +57,28 @@ const form = useForm({
     telefono: '',
 });
 
-// Estado para el popover de pacientes
-const openPacientes = ref(false);
-const searchPaciente = ref('');
-
-// Paciente seleccionado para mostrar en el botón
-const pacienteSeleccionado = computed(() => {
-    if (!form.paciente_id) return null;
-    return props.pacientes.find(p => p.id === form.paciente_id);
-});
+// Estado para búsqueda de pacientes
+const busquedaPaciente = ref('');
 
 // Filtrar pacientes por búsqueda (nombre o RUT)
 const pacientesFiltrados = computed(() => {
-    const search = searchPaciente.value.toLowerCase().trim();
+    const search = busquedaPaciente.value.toLowerCase().trim();
     if (!search) return props.pacientes;
     
     return props.pacientes.filter(p => {
         const nombre = (p.nombre || '').toLowerCase();
-        const rut = (p.rut || '').toLowerCase();
-        return nombre.includes(search) || rut.includes(search);
+        const rut = (p.rut || '').toLowerCase().replace(/\./g, '').replace(/-/g, ''); // Normalizar RUT
+        const searchNormalized = search.replace(/\./g, '').replace(/-/g, '');
+        
+        return nombre.includes(search) || rut.includes(searchNormalized);
     });
 });
 
-// Función para seleccionar paciente
-const seleccionarPaciente = (pacienteId: string) => {
-    form.paciente_id = pacienteId;
-    openPacientes.value = false;
-    searchPaciente.value = '';
-};
+// Paciente seleccionado para mostrar
+const pacienteSeleccionado = computed(() => {
+    if (!form.paciente_id) return null;
+    return props.pacientes.find(p => p.id === form.paciente_id);
+});
 
 // Watch para autorrellenar cuando se selecciona un paciente
 watch(() => form.paciente_id, (pacienteId) => {
@@ -198,53 +179,71 @@ const submit = () => {
                                 <div class="space-y-2">
                                     <Label for="paciente" class="flex items-center gap-2">
                                         <User class="h-4 w-4" />
-                                        Seleccionar Paciente
+                                        Buscar Paciente
                                     </Label>
-                                    <Popover v-model:open="openPacientes">
-                                        <PopoverTrigger as-child>
+                                    <div class="relative">
+                                        <Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            v-model="busquedaPaciente"
+                                            placeholder="Buscar por nombre o RUT..."
+                                            class="pl-10 pr-10"
+                                        />
+                                        <Button
+                                            v-if="busquedaPaciente"
+                                            variant="ghost"
+                                            size="icon"
+                                            class="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                                            @click="busquedaPaciente = ''"
+                                        >
+                                            <X class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    
+                                    <!-- Lista de pacientes filtrados -->
+                                    <div v-if="busquedaPaciente && pacientesFiltrados.length > 0" class="mt-2 max-h-60 overflow-y-auto rounded-md border">
+                                        <div class="p-1">
                                             <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                :aria-expanded="openPacientes"
-                                                class="w-full justify-between"
+                                                v-for="paciente in pacientesFiltrados"
+                                                :key="paciente.id"
+                                                variant="ghost"
+                                                class="w-full justify-start text-left font-normal"
+                                                @click="() => {
+                                                    form.paciente_id = paciente.id;
+                                                    busquedaPaciente = '';
+                                                }"
                                             >
-                                                <span class="truncate">
-                                                    {{ pacienteSeleccionado ? pacienteSeleccionado.label : 'Seleccione un paciente o ingrese datos manualmente...' }}
-                                                </span>
-                                                <Search class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                <User class="mr-2 h-4 w-4" />
+                                                <div class="flex flex-col">
+                                                    <span>{{ paciente.nombre }}</span>
+                                                    <span class="text-xs text-muted-foreground">{{ paciente.rut }}</span>
+                                                </div>
                                             </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent class="w-full p-0" align="start">
-                                            <Command>
-                                                <CommandInput 
-                                                    v-model="searchPaciente"
-                                                    placeholder="Buscar por nombre o RUT..." 
-                                                />
-                                                <CommandList>
-                                                    <CommandEmpty>No se encontraron pacientes</CommandEmpty>
-                                                    <CommandGroup>
-                                                        <CommandItem
-                                                            value="__manual__"
-                                                            @select="seleccionarPaciente('')"
-                                                        >
-                                                            <User class="mr-2 h-4 w-4" />
-                                                            Ingresar datos manualmente
-                                                        </CommandItem>
-                                                        <CommandItem
-                                                            v-for="paciente in pacientesFiltrados"
-                                                            :key="paciente.id"
-                                                            :value="paciente.id"
-                                                            @select="seleccionarPaciente(paciente.id)"
-                                                        >
-                                                            {{ paciente.label }}
-                                                        </CommandItem>
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
+                                        </div>
+                                    </div>
+                                    
+                                    <div v-else-if="busquedaPaciente && pacientesFiltrados.length === 0" class="mt-2 rounded-md border p-4 text-center text-sm text-muted-foreground">
+                                        No se encontraron pacientes
+                                    </div>
+                                    
+                                    <!-- Paciente seleccionado -->
+                                    <div v-if="pacienteSeleccionado" class="mt-2 flex items-center gap-2 rounded-md border bg-muted/50 p-3">
+                                        <User class="h-4 w-4 text-muted-foreground" />
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium">{{ pacienteSeleccionado.nombre }}</p>
+                                            <p class="text-xs text-muted-foreground">{{ pacienteSeleccionado.rut }}</p>
+                                        </div>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            class="h-7 w-7"
+                                            @click="form.paciente_id = ''"
+                                        >
+                                            <X class="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    
                                     <p class="text-sm text-muted-foreground">
-                                        Haga clic y escriba para buscar. Si selecciona un paciente, sus datos se rellenarán automáticamente
+                                        Busque y seleccione un paciente. Si no está registrado, puede ingresar los datos manualmente abajo
                                     </p>
                                 </div>
 

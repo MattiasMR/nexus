@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
+use Kreait\Firebase\Contract\Auth as FirebaseAuth;
 
 class PasswordController extends Controller
 {
@@ -29,10 +30,24 @@ class PasswordController extends Controller
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $request->user()->update([
-            'password' => $validated['password'],
-        ]);
+        try {
+            $user = $request->user();
+            $auth = app(FirebaseAuth::class);
+            
+            // Actualizar contraseña en Firebase Auth
+            $auth->updateUser($user->uid, [
+                'password' => $validated['password'],
+            ]);
 
-        return back();
+            return back()->with('success', 'Contraseña actualizada correctamente');
+        } catch (\Exception $e) {
+            logger()->error("Error actualizando contraseña: " . $e->getMessage());
+            
+            if (str_contains($e->getMessage(), 'WEAK_PASSWORD')) {
+                return back()->withErrors(['password' => 'La contraseña es muy débil.']);
+            }
+            
+            return back()->withErrors(['password' => 'Error al actualizar la contraseña. Intenta nuevamente.']);
+        }
     }
 }

@@ -1,113 +1,112 @@
 <script setup lang="ts">
-import InputError from '@/components/InputError.vue';
-import TextLink from '@/components/TextLink.vue';
+import { login } from '@/routes';
+import { Head, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import AuthBase from '@/layouts/AuthLayout.vue';
-import { register } from '@/routes';
-import { store } from '@/routes/login';
-import { request } from '@/routes/password';
-import { Form, Head } from '@inertiajs/vue3';
-import { LoaderCircle } from 'lucide-vue-next';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { LogIn, AlertTriangle } from 'lucide-vue-next';
 
-defineProps<{
-    status?: string;
-    canResetPassword: boolean;
-    canRegister: boolean;
-}>();
+const form = useForm({
+    email: '',
+    password: '',
+    remember: false,
+});
+
+const submit = () => {
+    form.post(login.url(), {
+        onFinish: () => {
+            form.reset('password');
+        },
+    });
+};
 </script>
 
 <template>
-    <AuthBase
-        title="Log in to your account"
-        description="Enter your email and password below to log in"
-    >
-        <Head title="Log in" />
+    <Head title="Iniciar Sesión" />
+    
+    <div class="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card class="w-full max-w-md">
+            <CardHeader class="space-y-1">
+                <CardTitle class="text-2xl font-bold text-center">
+                    Iniciar Sesión
+                </CardTitle>
+                <CardDescription class="text-center">
+                    Panel de Administración
+                </CardDescription>
+            </CardHeader>
 
-        <div
-            v-if="status"
-            class="mb-4 text-center text-sm font-medium text-green-600"
-        >
-            {{ status }}
-        </div>
-
-        <Form
-            v-bind="store.form()"
-            :reset-on-success="['password']"
-            v-slot="{ errors, processing }"
-            class="flex flex-col gap-6"
-        >
-            <div class="grid gap-6">
-                <div class="grid gap-2">
-                    <Label for="email">Email address</Label>
-                    <Input
-                        id="email"
-                        type="email"
-                        name="email"
-                        required
-                        autofocus
-                        :tabindex="1"
-                        autocomplete="email"
-                        placeholder="email@example.com"
-                    />
-                    <InputError :message="errors.email" />
+            <CardContent class="space-y-4">
+                <!-- Advertencia solo para administradores -->
+                <div class="flex items-start gap-3 rounded-lg border border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/50 p-3">
+                    <AlertTriangle class="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                        Solo administradores pueden acceder a este panel
+                    </p>
                 </div>
 
-                <div class="grid gap-2">
-                    <div class="flex items-center justify-between">
-                        <Label for="password">Password</Label>
-                        <TextLink
-                            v-if="canResetPassword"
-                            :href="request()"
-                            class="text-sm"
-                            :tabindex="5"
-                        >
-                            Forgot password?
-                        </TextLink>
+                <form @submit.prevent="submit" class="space-y-4">
+                    <!-- Email -->
+                    <div class="space-y-2">
+                        <Label for="email">Correo Electrónico</Label>
+                        <Input
+                            id="email"
+                            v-model="form.email"
+                            type="email"
+                            placeholder="admin@nexus.cl"
+                            autocomplete="email"
+                            required
+                            :disabled="form.processing"
+                        />
                     </div>
-                    <Input
-                        id="password"
-                        type="password"
-                        name="password"
-                        required
-                        :tabindex="2"
-                        autocomplete="current-password"
-                        placeholder="Password"
-                    />
-                    <InputError :message="errors.password" />
-                </div>
 
-                <div class="flex items-center justify-between">
-                    <Label for="remember" class="flex items-center space-x-3">
-                        <Checkbox id="remember" name="remember" :tabindex="3" />
-                        <span>Remember me</span>
-                    </Label>
-                </div>
+                    <!-- Password -->
+                    <div class="space-y-2">
+                        <Label for="password">Contraseña</Label>
+                        <Input
+                            id="password"
+                            v-model="form.password"
+                            type="password"
+                            placeholder="••••••••"
+                            autocomplete="current-password"
+                            required
+                            :disabled="form.processing"
+                        />
+                    </div>
 
-                <Button
-                    type="submit"
-                    class="mt-4 w-full"
-                    :tabindex="4"
-                    :disabled="processing"
-                    data-test="login-button"
-                >
-                    <LoaderCircle
-                        v-if="processing"
-                        class="h-4 w-4 animate-spin"
-                    />
-                    Log in
-                </Button>
-            </div>
+                    <!-- Remember me -->
+                    <div class="flex items-center space-x-2">
+                        <Checkbox 
+                            id="remember"
+                            :checked="form.remember"
+                            @update:checked="form.remember = $event"
+                            :disabled="form.processing"
+                        />
+                        <Label
+                            for="remember"
+                            class="text-sm font-normal cursor-pointer"
+                        >
+                            Recordarme
+                        </Label>
+                    </div>
 
-            <div
-                class="text-center text-sm text-muted-foreground"
-                v-if="canRegister"
-            >
-                Don't have an account?
-                <TextLink :href="register()" :tabindex="5">Sign up</TextLink>
-            </div>
-        </Form>
-    </AuthBase>
+                    <!-- Error message -->
+                    <div v-if="form.errors.email" class="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                        <p class="text-sm text-destructive">{{ form.errors.email }}</p>
+                    </div>
+
+                    <!-- Submit button -->
+                    <Button
+                        type="submit"
+                        class="w-full"
+                        :disabled="form.processing"
+                    >
+                        <LogIn class="mr-2 h-4 w-4" />
+                        {{ form.processing ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
+    </div>
 </template>

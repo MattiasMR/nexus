@@ -37,8 +37,8 @@ return [
 
     'guards' => [
         'web' => [
-            'driver' => 'session',
-            'provider' => 'users',
+            'driver' => 'firebase',
+            'provider' => 'usuarios',
         ],
     ],
 
@@ -55,11 +55,16 @@ return [
     | providers to represent the model / table. These providers may then
     | be assigned to any extra authentication guards you have defined.
     |
-    | Supported: "database", "eloquent"
+    | Supported: "database", "eloquent", "firestore"
     |
     */
 
     'providers' => [
+        'usuarios' => [
+            'driver' => 'firestore',
+            'model' => App\Models\Usuario::class,
+        ],
+        
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),

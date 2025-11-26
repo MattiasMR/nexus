@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/usuario.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 
@@ -13,127 +14,47 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  
-  bool _obscurePassword = true;
-  bool _rememberMe = false;
+  final TextEditingController _searchController = TextEditingController();
   bool _isLoading = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadSavedEmail();
+    _searchController.addListener(_handleSearchChanged);
   }
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _searchController.removeListener(_handleSearchChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
-  /// Cargar email guardado si existe
-  Future<void> _loadSavedEmail() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final savedEmail = await authProvider.authService.getLastEmail();
-    final rememberMe = await authProvider.authService.getRememberMe();
-    
-    if (!mounted) return;
-    
-    if (savedEmail != null && rememberMe) {
-      setState(() {
-        _emailController.text = savedEmail;
-        _rememberMe = true;
-      });
-    }
+  void _handleSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.trim().toLowerCase();
+    });
   }
 
-  /// Iniciar sesión
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _handleUserSelection(Usuario usuario) async {
+    if (_isLoading) return;
 
-    if (!mounted) return;
     setState(() => _isLoading = true);
-
-    debugPrint('🔐 Intentando login con: ${_emailController.text.trim()}');
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.signIn(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      rememberMe: _rememberMe,
-    );
-
-    debugPrint('🔐 Resultado del login: ${success ? 'ÉXITO' : 'FALLO'}');
-    debugPrint('🔐 Estado de auth: ${authProvider.status}');
-    if (authProvider.currentUser != null) {
-      debugPrint('✅ Usuario autenticado: ${authProvider.currentUser!.nombreCompleto}');
-    }
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.signInWithUsuario(usuario);
 
     if (!mounted) return;
     setState(() => _isLoading = false);
-
-    if (!mounted) return;
 
     if (!success) {
-      // Mostrar error
-      debugPrint('❌ Error de login: ${authProvider.errorMessage}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Error al iniciar sesión'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      authProvider.clearError();
-    } else {
-      debugPrint('✅ Login exitoso, navegando...');
-    }
-    // Si es exitoso, la navegación se maneja en main.dart con go_router
-  }
-
-  /// Recuperar contraseña
-  Future<void> _handleForgotPassword() async {
-    final email = _emailController.text.trim();
-
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingresa tu email para recuperar la contraseña'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.sendPasswordResetEmail(email);
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Email de recuperación enviado a $email'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Error al enviar email'),
+          content: Text(authProvider.errorMessage ?? 'No se pudo iniciar sesión'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
-      authProvider.clearError();
     }
   }
 
@@ -197,56 +118,32 @@ class _LoginPageState extends State<LoginPage> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        padding: const EdgeInsets.all(32.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Logo/Header
-              _buildHeader(),
-              const SizedBox(height: 32),
-              
-              // Email field
-              _buildEmailField(),
-              const SizedBox(height: 16),
-              
-              // Password field
-              _buildPasswordField(),
-              const SizedBox(height: 16),
-              
-              // Remember me checkbox
-              _buildRememberMeCheckbox(),
-              const SizedBox(height: 24),
-              
-              // Login button
-              _buildLoginButton(),
-              const SizedBox(height: 16),
-              
-              // Forgot password
-              _buildForgotPasswordButton(),
-              const SizedBox(height: 8),
-              
-              // Divider
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('o'),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-              ),
-              
-              // Register button
-              _buildRegisterButton(),
-            ],
-          ),
+        constraints: const BoxConstraints(maxWidth: 440, minHeight: 520),
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 24),
+            Text(
+              'Selecciona un paciente para iniciar sesión rápidamente. '
+              'Esta versión MVP no requiere contraseña.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            _buildSearchField(),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 360,
+              child: _buildUserList(),
+            ),
+            const SizedBox(height: 16),
+            _buildRegisterButton(),
+          ],
         ),
       ),
     );
@@ -287,138 +184,134 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildEmailField() {
-    return TextFormField(
-      controller: _emailController,
-      keyboardType: TextInputType.emailAddress,
-      textInputAction: TextInputAction.next,
+  Widget _buildSearchField() {
+    return TextField(
+      controller: _searchController,
       enabled: !_isLoading,
       decoration: InputDecoration(
-        labelText: 'Correo Electrónico',
-        hintText: 'ejemplo@email.com',
-        prefixIcon: const Icon(Icons.email_outlined),
+        labelText: 'Buscar paciente por nombre, email o RUT',
+        prefixIcon: const Icon(Icons.search),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
       ),
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return 'Ingresa tu correo electrónico';
-        }
-        if (!value.contains('@')) {
-          return 'Ingresa un correo válido';
-        }
-        return null;
-      },
     );
   }
 
-  Widget _buildPasswordField() {
-    return TextFormField(
-      controller: _passwordController,
-      obscureText: _obscurePassword,
-      textInputAction: TextInputAction.done,
-      enabled: !_isLoading,
-      onFieldSubmitted: (_) => _handleLogin(),
-      decoration: InputDecoration(
-        labelText: 'Contraseña',
-        hintText: '••••••••',
-        prefixIcon: const Icon(Icons.lock_outlined),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _obscurePassword ? Icons.visibility_off : Icons.visibility,
-          ),
-          onPressed: () {
-            setState(() => _obscurePassword = !_obscurePassword);
+  Widget _buildUserList() {
+    final authProvider = context.watch<AuthProvider>();
+
+    return StreamBuilder<List<Usuario>>(
+      stream: authProvider.pacientesStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return _buildStateMessage(
+            icon: Icons.error_outline,
+            color: Colors.red,
+            message: 'Error al cargar pacientes: ${snapshot.error}',
+          );
+        }
+
+        final usuarios = snapshot.data ?? [];
+        final filtered = _filterUsuarios(usuarios);
+
+        if (filtered.isEmpty) {
+          return _buildStateMessage(
+            icon: Icons.people_outline,
+            color: Colors.grey,
+            message: _searchQuery.isEmpty
+                ? 'Aún no hay pacientes registrados.'
+                : 'No encontramos coincidencias para "${_searchController.text}"',
+            showRegisterHint: true,
+          );
+        }
+
+        return ListView.separated(
+          itemCount: filtered.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final usuario = filtered[index];
+            return _buildUserTile(usuario);
           },
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Ingresa tu contraseña';
-        }
-        if (value.length < 6) {
-          return 'La contraseña debe tener al menos 6 caracteres';
-        }
-        return null;
+        );
       },
     );
   }
 
-  Widget _buildRememberMeCheckbox() {
-    return Row(
-      children: [
-        Checkbox(
-          value: _rememberMe,
-          onChanged: _isLoading
-              ? null
-              : (value) {
-                  setState(() => _rememberMe = value ?? false);
-                },
-        ),
-        Expanded(
+  Widget _buildStateMessage({
+    required IconData icon,
+    required Color color,
+    required String message,
+    bool showRegisterHint = false,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 56, color: color.withValues(alpha: 0.7)),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          if (showRegisterHint) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Crea un paciente desde Ionic o usando el botón "Crear Nueva Cuenta".',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserTile(Usuario usuario) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      elevation: 2,
+      child: ListTile(
+        enabled: !_isLoading,
+        onTap: () => _handleUserSelection(usuario),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
           child: Text(
-            'Recordar sesión',
-            style: Theme.of(context).textTheme.bodyMedium,
+            usuario.nombre.isNotEmpty
+                ? usuario.nombre.characters.first.toUpperCase()
+                : '?',
+            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildLoginButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleLogin,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 2,
+        title: Text(usuario.nombreCompleto),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(usuario.email),
+            if (usuario.rut.isNotEmpty)
+              Text('RUT: ${usuario.rut}', style: const TextStyle(fontSize: 12)),
+          ],
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _isLoading
-              ? const SizedBox(
-                  key: ValueKey('loading'),
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Text(
-                  'Iniciar Sesión',
-                  key: ValueKey('text'),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-        ),
+        trailing: const Icon(Icons.login, color: Colors.black54),
       ),
     );
   }
 
-  Widget _buildForgotPasswordButton() {
-    return TextButton(
-      onPressed: _isLoading ? null : _handleForgotPassword,
-      child: Text(
-        '¿Olvidaste tu contraseña?',
-        style: TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+  List<Usuario> _filterUsuarios(List<Usuario> usuarios) {
+    if (_searchQuery.isEmpty) return usuarios;
+    return usuarios.where((usuario) {
+      final nombre = usuario.nombreCompleto.toLowerCase();
+      final email = usuario.email.toLowerCase();
+      final rut = usuario.rut.toLowerCase();
+      return nombre.contains(_searchQuery) ||
+          email.contains(_searchQuery) ||
+          rut.contains(_searchQuery);
+    }).toList();
   }
 
   Widget _buildRegisterButton() {
@@ -429,7 +322,7 @@ class _LoginPageState extends State<LoginPage> {
               context.go('/register');
             },
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 50),
+        minimumSize: const Size(double.infinity, 48),
         side: BorderSide(color: AppColors.primary, width: 2),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

@@ -26,6 +26,7 @@ class AuthProvider with ChangeNotifier {
   AuthStatus get status => _status;
   Usuario? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
+  Stream<List<Usuario>> get pacientesStream => _authService.streamAllPacientes();
 
   bool get isAuthenticated => _status == AuthStatus.authenticated && _currentUser != null;
   bool get isLoading => _status == AuthStatus.loading;
@@ -122,6 +123,55 @@ class AuthProvider with ChangeNotifier {
         fechaNacimiento: fechaNacimiento,
         sexo: sexo,
       );
+
+      _currentUser = usuario;
+      _status = AuthStatus.authenticated;
+      notifyListeners();
+      return true;
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error inesperado: ${e.toString()}';
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Iniciar sesión seleccionando un usuario existente (MVP)
+  Future<bool> signInWithUserId(String userId) async {
+    try {
+      final usuario = await _authService.getUsuarioById(userId);
+      if (usuario == null) {
+        throw AuthException('Usuario no encontrado', 'user-not-found');
+      }
+      return signInWithUsuario(usuario);
+    } on AuthException catch (e) {
+      _errorMessage = e.message;
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Error al seleccionar usuario: ${e.toString()}';
+      _status = AuthStatus.error;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Completar inicio de sesión usando un objeto de usuario existente
+  Future<bool> signInWithUsuario(Usuario usuario) async {
+    _status = AuthStatus.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      if (!usuario.activo) {
+        throw AuthException('Usuario inactivo. Contacte al administrador', 'user-inactive');
+      }
 
       _currentUser = usuario;
       _status = AuthStatus.authenticated;
