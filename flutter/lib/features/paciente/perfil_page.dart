@@ -571,7 +571,7 @@ class _PerfilPageState extends State<PerfilPage> {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: DropdownButtonFormField<String>(
-          value: effectiveValue,
+          initialValue: effectiveValue,
           decoration: InputDecoration(
             labelText: label,
             prefixIcon: Icon(icon),

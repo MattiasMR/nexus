@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers;![1764209311804](image/FichaMedicaController/1764209311804.png)![1764209435143](image/FichaMedicaController/1764209435143.png)
 
 use App\Models\FichaMedica;
 use App\Models\Paciente;
