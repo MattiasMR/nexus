@@ -249,6 +249,35 @@ class UsuarioController extends Controller
                     ]);
 
                 logger()->info('✅ Registro de paciente creado', ['idPaciente' => $pacienteId]);
+
+                // Crear ficha médica vacía para el paciente
+                logger()->info('📝 Creando ficha médica vacía para el paciente');
+                
+                $fichaRef = $firestore->database()->collection('fichasMedicas')->newDocument();
+                $fichaId = $fichaRef->id();
+                
+                $fichaData = [
+                    'id' => $fichaId,
+                    'idPaciente' => $pacienteId,
+                    'antecedentes' => [
+                        'alergias' => [],
+                        'familiares' => '',
+                        'hospitalizaciones' => '',
+                        'personales' => '',
+                        'quirurgicos' => '',
+                    ],
+                    'observacion' => '',
+                    'totalConsultas' => 0,
+                    'ultimaConsulta' => null,
+                    'fechaMedica' => now()->toISOString(),
+                    'createdAt' => now()->toDateTime(),
+                    'updatedAt' => now()->toDateTime(),
+                ];
+
+                $fichaRef->set($fichaData);
+
+                logger()->info('✅ Ficha médica creada', ['idFicha' => $fichaId]);
+
             } elseif ($validated['rol'] === 'profesional') {
                 logger()->info('📝 Creando registro de profesional vinculado');
                 

@@ -23,18 +23,39 @@ import { SkeletonLoaderComponent } from '../../../shared/components/skeleton-loa
 /**
  * UI-friendly patient display interface with calculated fields
  */
-interface PacienteUI extends Paciente {
+interface PacienteUI {
+  id: string;
   edad?: number;
   iniciales?: string;
   nombreCompleto?: string;
-  // For compatibility with existing template
   nombres?: string;
   apellidos?: string;
   documento?: string;
+  rut?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
   estado?: 'activo' | 'inactivo';
   ultimaVisita?: string;
   ubicacion?: string;
   diagnostico?: string;
+  // Medical data
+  fechaNacimiento?: Date | Timestamp;
+  sexo?: 'M' | 'F' | 'Otro';
+  grupoSanguineo?: string;
+  alergias?: string[];
+  enfermedadesCronicas?: string[];
+  medicamentosActuales?: any[];
+  contactoEmergencia?: any;
+  prevision?: string;
+  numeroFicha?: string;
+  observaciones?: string;
+  alertasMedicas?: any[];
+  idUsuario?: string;
+  idPaciente?: string;
+  // Timestamps
+  createdAt?: Date | Timestamp;
+  updatedAt?: Date | Timestamp;
 }
 
 @Component({
@@ -122,23 +143,45 @@ export class PatientListPage implements OnInit, OnDestroy {
   /**
    * Enrich patient data with calculated fields and template compatibility
    */
-  private enrichPatient = (paciente: Paciente): PacienteUI => {
-    const nombreCompleto = `${paciente.nombre} ${paciente.apellido}`;
+  private enrichPatient = (paciente: any): PacienteUI => {
+    const nombre = paciente.nombre || paciente.displayName?.split(' ')[0] || '';
+    const apellido = paciente.apellido || paciente.displayName?.split(' ').slice(1).join(' ') || '';
+    const nombreCompleto = paciente.nombreCompleto || paciente.displayName || `${nombre} ${apellido}`;
     
     return {
-      ...paciente,
+      id: paciente.id || paciente.idPaciente,
       // Calculated fields
       edad: this.calculateAge(paciente.fechaNacimiento),
       iniciales: this.initials(nombreCompleto),
       nombreCompleto,
-      // Template compatibility (map singular to plural)
-      nombres: paciente.nombre,
-      apellidos: paciente.apellido,
-      documento: paciente.rut,
+      // Personal data
+      nombres: nombre,
+      apellidos: apellido,
+      documento: paciente.rut || paciente.documento,
+      rut: paciente.rut,
+      telefono: paciente.telefono,
+      email: paciente.email,
+      direccion: paciente.direccion || paciente.ubicacion,
+      // Status fields
       estado: (paciente as any).estado || 'activo',
-      diagnostico: (paciente as any).diagnostico || 'Sin diagnóstico registrado',
-      ubicacion: paciente.direccion || 'Sin dirección',
-      ultimaVisita: this.formatDate(paciente.updatedAt)
+      // diagnostico se guarda en 'observaciones' en Firestore
+      diagnostico: paciente.observaciones || 'Sin diagnóstico registrado',
+      ubicacion: paciente.direccion || paciente.ubicacion || 'Sin dirección',
+      ultimaVisita: this.formatDate(paciente.updatedAt),
+      // Medical data
+      fechaNacimiento: paciente.fechaNacimiento,
+      sexo: paciente.sexo,
+      grupoSanguineo: paciente.grupoSanguineo,
+      alergias: paciente.alergias,
+      enfermedadesCronicas: paciente.enfermedadesCronicas,
+      medicamentosActuales: paciente.medicamentosActuales,
+      contactoEmergencia: paciente.contactoEmergencia,
+      prevision: paciente.prevision,
+      numeroFicha: paciente.numeroFicha,
+      observaciones: paciente.observaciones,
+      alertasMedicas: paciente.alertasMedicas,
+      idUsuario: paciente.idUsuario,
+      idPaciente: paciente.idPaciente
     };
   };
 
@@ -182,8 +225,17 @@ export class PatientListPage implements OnInit, OnDestroy {
   }
   
   verFicha(paciente: PacienteUI) { 
+    // Usar idPaciente (ID del documento en 'pacientes') no id (UID de usuario)
+    const patientId = paciente.idPaciente || paciente.id;
+    console.log('📋 Ver Ficha - Paciente:', {
+      id: paciente.id,
+      idPaciente: paciente.idPaciente,
+      idUsuario: paciente.idUsuario,
+      patientId: patientId,
+      nombreCompleto: paciente.nombreCompleto
+    });
     this.router.navigate(['/tabs/tab3'], { 
-      queryParams: { patientId: paciente.id } 
+      queryParams: { patientId: patientId } 
     }); 
   }
 
@@ -210,9 +262,10 @@ export class PatientListPage implements OnInit, OnDestroy {
           console.error('Search error:', error);
           // Fallback to client-side filtering
           this.filteredPacientes = this.pacientes.filter(p =>
-            p.nombre?.toLowerCase().includes(this.query) ||
-            p.apellido?.toLowerCase().includes(this.query) ||
+            p.nombres?.toLowerCase().includes(this.query) ||
+            p.apellidos?.toLowerCase().includes(this.query) ||
             p.rut?.toLowerCase().includes(this.query) ||
+            p.documento?.toLowerCase().includes(this.query) ||
             p.nombreCompleto?.toLowerCase().includes(this.query)
           );
           this.isLoading = false;
@@ -281,16 +334,17 @@ export class PatientListPage implements OnInit, OnDestroy {
    */
   openEdit(paciente: PacienteUI) {
     this.isEditMode = true;
-    this.editingPacienteId = paciente.id || null;
+    // IMPORTANTE: Usar idPaciente (ID del documento en 'pacientes') no id (UID de usuario)
+    this.editingPacienteId = paciente.idPaciente || paciente.id || null;
     
     // Pre-fill form with existing patient data - MAP ALL FIELDS
     this.newPaciente = {
       // Basic fields
-      nombres: paciente.nombre,
-      apellidos: paciente.apellido,
-      rut: paciente.rut,
+      nombres: paciente.nombres,
+      apellidos: paciente.apellidos,
+      rut: paciente.rut || paciente.documento,
       telefono: paciente.telefono,
-      direccion: paciente.direccion,
+      direccion: paciente.direccion || paciente.ubicacion,
       fechaNacimiento: paciente.fechaNacimiento,
       grupoSanguineo: paciente.grupoSanguineo,
       email: (paciente as any).email || '',
@@ -300,7 +354,8 @@ export class PatientListPage implements OnInit, OnDestroy {
       estadoCivil: (paciente as any).estadoCivil || 'soltero',
       ocupacion: (paciente as any).ocupacion || '',
       estado: (paciente as any).estado || 'activo',
-      diagnostico: (paciente as any).diagnostico || '',
+      // diagnostico se guarda en 'observaciones' en Firestore
+      diagnostico: paciente.observaciones || paciente.diagnostico || '',
       // Arrays
       alergias: paciente.alergias?.join(', ') || '',
       enfermedadesCronicas: paciente.enfermedadesCronicas?.join(', ') || '',
@@ -441,9 +496,10 @@ export class PatientListPage implements OnInit, OnDestroy {
     this.isLoading = true;
 
     // Preparar datos para Firestore
-    const pacienteData: Partial<Paciente> = {
-      nombre: nombre.trim(),
-      apellido: apellido.trim(),
+    // Note: Using 'any' type for compatibility with old data structure
+    // TODO: Migrate to new architecture (usuarios + pacientes collections)
+    const pacienteData: any = {
+      displayName: `${nombre.trim()} ${apellido.trim()}`,
       rut: rut.trim(),
       fechaNacimiento: typeof p.fechaNacimiento === 'string'
         ? Timestamp.fromDate(new Date(p.fechaNacimiento))
@@ -463,6 +519,7 @@ export class PatientListPage implements OnInit, OnDestroy {
 
     // Only add optional fields if they have values
     if (p.email?.trim()) {
+      // Email should be in usuarios collection in new architecture
       pacienteData.email = p.email.trim();
     }
     if (p.grupoSanguineo?.trim()) {
@@ -479,17 +536,68 @@ export class PatientListPage implements OnInit, OnDestroy {
 
     try {
       if (this.isEditMode && this.editingPacienteId) {
-        // UPDATE existing patient
-        await this.pacientesService.updatePaciente(this.editingPacienteId, pacienteData);
+        // UPDATE existing patient with new architecture
+        console.log('✏️ Actualizando paciente existente con nueva arquitectura...');
+        
+        await this.pacientesService.updatePacienteCompleto(
+          this.editingPacienteId,
+          // Datos personales (van a 'usuarios')
+          {
+            displayName: `${nombre.trim()} ${apellido.trim()}`,
+            telefono: p.telefono?.trim()
+          },
+          // Datos médicos (van a 'pacientes')
+          {
+            fechaNacimiento: typeof p.fechaNacimiento === 'string'
+              ? Timestamp.fromDate(new Date(p.fechaNacimiento))
+              : p.fechaNacimiento,
+            sexo: (p.sexo || p.genero || 'Otro') as 'M' | 'F' | 'Otro',
+            grupoSanguineo: p.grupoSanguineo?.trim() as any,
+            observaciones: p.diagnostico?.trim() || p.observaciones
+          }
+        );
+        
         this.lastCreatedPatientId = null; // Clear temp sort
+        console.log('✅ Paciente actualizado correctamente');
       } else {
-        // CREATE new patient
-        const docId = await this.pacientesService.createPaciente(pacienteData as Omit<Paciente, 'id'>);
-        this.lastCreatedPatientId = docId; // Store for temp sorting
+        // CREATE new patient with new architecture
+        console.log('🆕 Creando nuevo paciente con arquitectura normalizada...');
+        
+        // Generate temporary password (user should change it later)
+        const tempPassword = `${rut.trim().substring(0, 8)}${Math.floor(Math.random() * 1000)}`;
+        
+        const pacienteCompleto = await this.pacientesService.createPacienteCompleto(
+          // Datos personales para usuario
+          {
+            email: p.email?.trim() || `${rut.trim()}@nexus.temp`,  // Email temporal si no se proporciona
+            password: tempPassword,
+            displayName: `${nombre.trim()} ${apellido.trim()}`,
+            rut: rut.trim(),
+            telefono: p.telefono?.trim()
+          },
+          // Datos médicos para paciente
+          {
+            fechaNacimiento: typeof p.fechaNacimiento === 'string'
+              ? Timestamp.fromDate(new Date(p.fechaNacimiento))
+              : Timestamp.now(),
+            sexo: (p.sexo || p.genero || 'Otro') as 'M' | 'F' | 'Otro',
+            grupoSanguineo: p.grupoSanguineo?.trim() as any,
+            alergias: [],
+            enfermedadesCronicas: [],
+            medicamentosActuales: [],
+            prevision: 'FONASA',
+            observaciones: p.diagnostico?.trim() || 'Sin observaciones',
+            alertasMedicas: []
+          }
+        );
+        
+        this.lastCreatedPatientId = pacienteCompleto.idPaciente; // Store for temp sorting
+        
+        console.log('✅ Paciente creado:', pacienteCompleto);
         
         // Auto-create ficha medica with patient data
         await this.fichasMedicasService.createFicha({
-          idPaciente: docId,
+          idPaciente: pacienteCompleto.idPaciente,
           fechaMedica: Timestamp.now(),
           observacion: `Ficha médica de ${nombre.trim()} ${apellido.trim()}`,
           antecedentes: {
@@ -501,6 +609,8 @@ export class PatientListPage implements OnInit, OnDestroy {
           },
           totalConsultas: 0
         });
+        
+        console.log('📋 Ficha médica creada automáticamente');
       }
 
       this.loadPatients(); // Reload patient list
@@ -547,11 +657,11 @@ export class PatientListPage implements OnInit, OnDestroy {
   exportar() {
     const header = ['Nombre','Apellido','RUT','Teléfono','Email','Edad','Última actualización'];
     const rows = this.filtered.map(p => [
-      p.nombre, 
-      p.apellido, 
-      p.rut, 
-      p.telefono || '', 
-      p.email || '', 
+      p.nombres,
+      p.apellidos,
+      p.rut || p.documento || '',
+      p.telefono || '',
+      p.email || '',
       p.edad || '',
       this.formatDate(p.updatedAt)
     ]);

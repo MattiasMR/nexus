@@ -24,7 +24,7 @@ import { NuevaOrdenExamenModalComponent } from '../components/nueva-orden-examen
 // Modelos
 import { OrdenExamen, ExamenSolicitado } from '../../../models/orden-examen.model';
 import { Examen } from '../../../models/examen.model';
-import { Paciente } from '../../../models/paciente.model';
+import { Paciente, PacienteCompleto } from '../../../models/paciente.model';
 
 /**
  * UI interface for exam order display with flattened first exam properties
@@ -57,7 +57,7 @@ export class ExamenesPage implements OnInit, OnDestroy {
   isLoading = false;
   error: string | null = null;
   patientId: string | null = null;
-  paciente: Paciente | null = null;
+  paciente: PacienteCompleto | null = null;
   
   // Modal para crear orden de examen
   isCreateModalOpen = false;
@@ -85,7 +85,7 @@ export class ExamenesPage implements OnInit, OnDestroy {
       this.route.queryParams.subscribe(params => {
         this.patientId = params['patientId'];
         if (this.patientId) {
-          this.loadExams(this.patientId);
+          // Solo cargar paciente, que a su vez cargará los exámenes con el ID correcto
           this.loadPacienteData(this.patientId);
         } else {
           this.error = 'No se especificó el ID del paciente';
@@ -98,13 +98,20 @@ export class ExamenesPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Load patient data
+   * Load patient data and store correct idPaciente
    */
   loadPacienteData(pacienteId: string) {
     this.subscriptions.push(
       this.pacientesService.getPacienteById(pacienteId).subscribe({
         next: (paciente) => {
           this.paciente = paciente || null;
+          // IMPORTANTE: Actualizar patientId con el idPaciente correcto
+          if (paciente && paciente.idPaciente) {
+            this.patientId = paciente.idPaciente;
+            console.log('📋 Examenes - Using correct idPaciente:', this.patientId);
+            // Recargar exámenes con el ID correcto
+            this.loadExams(this.patientId);
+          }
         },
         error: (error) => {
           console.error('Error loading patient:', error);
@@ -204,7 +211,7 @@ export class ExamenesPage implements OnInit, OnDestroy {
       component: NuevaOrdenExamenModalComponent,
       componentProps: {
         pacienteId: this.paciente.id,
-        pacienteNombre: `${this.paciente.nombre} ${this.paciente.apellido}`
+        pacienteNombre: this.paciente.nombre || this.paciente.displayName || `${this.paciente.displayName?.split(' ')[0]} ${this.paciente.displayName?.split(' ').slice(1).join(' ')}`
       }
     });
 

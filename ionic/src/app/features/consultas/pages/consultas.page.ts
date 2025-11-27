@@ -28,7 +28,7 @@ import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/
 import { TimelineComponent, TimelineItem } from '../../../shared/components/timeline/timeline.component';
 
 // Modelos
-import { Paciente } from '../../../models/paciente.model';
+import { Paciente, PacienteCompleto } from '../../../models/paciente.model';
 import { FichaMedica } from '../../../models/ficha-medica.model';
 import { Consulta } from '../../../models/consulta.model';
 import { OrdenExamen } from '../../../models/orden-examen.model';
@@ -108,7 +108,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Estados del componente
   ficha: FichaMedicaUI | null = null;
   fichaId: string | null = null;
-  paciente: Paciente | null = null;
+  paciente: PacienteCompleto | null = null;
   isLoading = false;
   error: string | null = null;
   patientId: string | null = null;
@@ -260,16 +260,36 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.error = null;
 
     try {
-      // Load all data using Promise.all with firstValueFrom - ensures completion
-      const [paciente, ficha, consultas, examenes] = await Promise.all([
-        firstValueFrom(this.pacientesService.getPacienteById(patientId)),
-        firstValueFrom(this.fichasMedicasService.getFichaByPacienteId(patientId)),
-        firstValueFrom(this.consultasService.getConsultasByPaciente(patientId)),
-        firstValueFrom(this.examenesService.getOrdenesByPaciente(patientId))
+      // Load patient first to get the correct idPaciente
+      const paciente = await firstValueFrom(this.pacientesService.getPacienteById(patientId));
+      
+      if (!paciente) {
+        this.error = 'No se encontró el paciente';
+        this.isLoading = false;
+        return;
+      }
+
+      // IMPORTANTE: Usar idPaciente del paciente cargado para todas las operaciones
+      const idPacienteReal = paciente.idPaciente;
+      console.log('🔍 Loading data for patient:', {
+        receivedId: patientId,
+        idPaciente: idPacienteReal,
+        idUsuario: paciente.id,
+        displayName: paciente.displayName
+      });
+
+      // Actualizar patientId con el ID correcto del documento paciente
+      this.patientId = idPacienteReal;
+
+      // Load all other data using the correct idPaciente
+      const [ficha, consultas, examenes] = await Promise.all([
+        firstValueFrom(this.fichasMedicasService.getFichaByPacienteId(idPacienteReal)),
+        firstValueFrom(this.consultasService.getConsultasByPaciente(idPacienteReal)),
+        firstValueFrom(this.examenesService.getOrdenesByPaciente(idPacienteReal))
       ]);
 
-      if (!paciente || !ficha) {
-        this.error = 'No se encontró el paciente o su ficha médica';
+      if (!ficha) {
+        this.error = 'No se encontró la ficha médica del paciente';
         this.isLoading = false;
         return;
       }
@@ -307,18 +327,18 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Construir la ficha médica UI a partir de los datos de Firestore
    */
   private buildFichaMedicaUI(
-    paciente: Paciente,
+    paciente: PacienteCompleto,
     ficha: FichaMedica,
     consultas: Consulta[],
     examenes: OrdenExamen[]
   ): FichaMedicaUI {
     const datosPersonales = {
-      nombres: paciente.nombre || 'Sin nombre',
-      apellidos: paciente.apellido || 'Sin apellido',
+      nombres: paciente.nombre || paciente.displayName?.split(' ')[0] || 'Sin nombre',
+      apellidos: paciente.apellido || paciente.displayName?.split(' ').slice(1).join(' ') || 'Sin apellido',
       rut: paciente.rut || 'Sin RUT',
       edad: this.calculateAge(paciente.fechaNacimiento),
       grupoSanguineo: paciente.grupoSanguineo || 'No registrado',
-      direccion: paciente.direccion || 'Sin dirección',
+      direccion: 'Sin dirección',  // direccion no está en el nuevo modelo
       telefono: paciente.telefono || 'Sin teléfono',
       contactoEmergencia: 'Contacto por definir' // TODO: Add to Paciente model
     };
@@ -506,17 +526,28 @@ export class ConsultasPage implements OnInit, OnDestroy {
    */
   private async guardarConsulta(consultaData: any) {
     try {
+      console.log('💾 Guardando consulta con data:', {
+        idPaciente: consultaData.idPaciente,
+        motivo: consultaData.motivo,
+        fecha: consultaData.fecha
+      });
+      
       const consultaId = await this.consultasService.createConsulta(consultaData);
+      console.log('✅ Consulta guardada con ID:', consultaId);
+      
       await this.showToast('Consulta guardada exitosamente', 'success');
       
       // Reload consultas using async/await (no subscriptions)
       if (this.patientId && this.ficha && this.paciente) {
+        console.log('🔄 Recargando consultas para paciente:', this.patientId);
         this.isLoading = true;
         
         try {
           const consultas = await firstValueFrom(
             this.consultasService.getConsultasByPaciente(this.patientId)
           );
+          
+          console.log('📋 Consultas cargadas:', consultas.length, consultas);
           
           // Update consultas section of ficha
           if (this.ficha) {
@@ -811,9 +842,31 @@ export class ConsultasPage implements OnInit, OnDestroy {
         return;
       }
       
-      console.log('📝 Cargando notas para paciente:', this.patientId);
+      console.log('═════════════════════════════════════════════');
+      console.log('📝 CARGANDO NOTAS');
+      console.log('═════════════════════════════════════════════');
+      console.log('🔍 this.patientId:', this.patientId);
+      console.log('🔍 this.paciente.idPaciente:', this.paciente?.idPaciente);
+      console.log('🔍 this.paciente.id:', this.paciente?.id);
+      console.log('═════════════════════════════════════════════');
+      
       this.notas = await this.notasService.getNotasByPaciente(this.patientId);
-      console.log('✅ Notas cargadas:', this.notas.length, this.notas);
+      
+      console.log('✅ Notas cargadas:', this.notas.length);
+      if (this.notas.length > 0) {
+        console.log('📋 Detalles de notas cargadas:');
+        this.notas.forEach((nota, idx) => {
+          console.log(`  Nota ${idx + 1}:`, {
+            id: nota.id,
+            idPaciente: nota.idPaciente,
+            contenido: nota.contenido.substring(0, 50) + '...',
+            fecha: nota.fecha
+          });
+        });
+      } else {
+        console.log('⚠️ No se encontraron notas para este idPaciente');
+      }
+      console.log('═════════════════════════════════════════════');
     } catch (error) {
       console.error('❌ Error al cargar notas:', error);
     }
@@ -849,13 +902,32 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Guardar nueva nota
    */
   async guardarNota() {
-    console.log('💾 Guardando nota:', this.datosNuevaNota);
+    console.log('═════════════════════════════════════════════');
+    console.log('💾 GUARDANDO NOTA');
+    console.log('═════════════════════════════════════════════');
+    console.log('📝 Contenido:', this.datosNuevaNota);
+    console.log('🔍 this.patientId:', this.patientId);
+    console.log('🔍 this.paciente.displayName:', this.paciente?.displayName);
+    console.log('🔍 this.paciente.idPaciente:', this.paciente?.idPaciente);
+    console.log('🔍 this.paciente.id:', this.paciente?.id);
+    console.log('═════════════════════════════════════════════');
     
     if (!this.datosNuevaNota.contenido.trim()) {
       const toast = await this.toastCtrl.create({
         message: 'El contenido de la nota no puede estar vacío',
         duration: 2000,
         color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    if (!this.patientId) {
+      console.error('❌ No hay patientId para guardar nota');
+      const toast = await this.toastCtrl.create({
+        message: 'Error: No se puede guardar la nota sin un paciente seleccionado',
+        duration: 3000,
+        color: 'danger'
       });
       await toast.present();
       return;
@@ -2279,16 +2351,21 @@ export class ConsultasPage implements OnInit, OnDestroy {
       return;
     }
     
+    // IMPORTANTE: Usar this.patientId (que es el idPaciente correcto) y nombres de campo correctos
     const consultaData = {
-      pacienteId: this.paciente?.id,
-      fichaMedicaId: this.fichaId,
+      idPaciente: this.patientId!, // ID del documento en colección 'pacientes'
+      idProfesional: 'system', // TODO: obtener del usuario logueado
+      idFichaMedica: this.fichaId!,
       fecha: Timestamp.fromDate(new Date(this.datosNuevaConsulta.fechaConsulta)),
-      motivoConsulta: this.datosNuevaConsulta.motivoConsulta,
-      diagnostico: this.datosNuevaConsulta.diagnostico,
+      motivo: this.datosNuevaConsulta.motivoConsulta, // campo correcto: 'motivo' no 'motivoConsulta'
       tratamiento: this.datosNuevaConsulta.tratamiento,
+      observaciones: this.datosNuevaConsulta.observaciones,
       signosVitales: this.datosNuevaConsulta.signosVitales,
-      observaciones: this.datosNuevaConsulta.observaciones
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
     };
+    
+    console.log('💾 Guardando consulta:', consultaData);
     
     await this.guardarConsulta(consultaData);
     this.cerrarPopupConsulta();

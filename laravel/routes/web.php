@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\WebPayController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\FichaMedicaController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -45,6 +46,13 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::post('/usuarios/{id}/verify-email', [UsuarioController::class, 'verifyEmail'])->name('usuarios.verify-email');
     Route::post('/usuarios/{id}/toggle-status', [UsuarioController::class, 'toggleStatus'])->name('usuarios.toggle-status');
     Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+    
+    // Rutas de gestión médica (fichas médicas de pacientes)
+    Route::get('/gestion-medica', [FichaMedicaController::class, 'index'])->name('gestion-medica.index');
+    Route::get('/gestion-medica/{idPaciente}', [FichaMedicaController::class, 'show'])->name('gestion-medica.show');
+    Route::put('/gestion-medica/{idFicha}', [FichaMedicaController::class, 'update'])->name('gestion-medica.update');
+    Route::delete('/gestion-medica/{idFicha}', [FichaMedicaController::class, 'destroy'])->name('gestion-medica.destroy');
+    Route::get('/gestion-medica/{idPaciente}/pdf', [FichaMedicaController::class, 'exportPdf'])->name('gestion-medica.pdf');
     
     // Rutas de compra de bonos
     Route::get('/comprar-bono', [WebPayController::class, 'showForm'])->name('comprar-bono');

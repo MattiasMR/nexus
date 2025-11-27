@@ -9,7 +9,7 @@
       <h1 class="examenes-title">
         <ion-icon name="flask"></ion-icon>
         Exámenes del Paciente
-        <span *ngIf="paciente" class="patient-name">- {{ paciente.nombre }} {{ paciente.apellido }}</span>
+        <span *ngIf="paciente" class="patient-name">- {{ paciente.displayName || (paciente.nombre + ' ' + paciente.apellido) }}</span>
       </h1>
       
       <ion-button color="primary" (click)="openCreateModal()">
