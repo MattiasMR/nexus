@@ -65,8 +65,7 @@ Thumbs.db
 
 # Laravel
 **/vendor/
-**/.env
-**/.env.backup
+
 **/.phpunit.result.cache
 **/.php_cs.cache
 **/Homestead.json
