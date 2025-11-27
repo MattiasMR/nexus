@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -27,9 +28,9 @@ class _MisExamenesPageState extends State<MisExamenesPage> {
     final authProvider = context.read<AuthProvider>();
     final usuario = authProvider.currentUser;
 
-    if (usuario == null) {
+    if (usuario == null || usuario.idPaciente == null) {
       return const Scaffold(
-        body: Center(child: Text('Error: Usuario no encontrado')),
+        body: Center(child: Text('Error: Usuario o ID de paciente no encontrado')),
       );
     }
 
@@ -57,7 +58,7 @@ class _MisExamenesPageState extends State<MisExamenesPage> {
         ],
       ),
       body: StreamBuilder<List<Documento>>(
-        stream: _obtenerExamenesPaciente(usuario.id),
+        stream: _obtenerExamenesPaciente(usuario.idPaciente!),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -428,6 +429,25 @@ class _MisExamenesPageState extends State<MisExamenesPage> {
     return TipoDocumento.examen;
   }
 
+  Future<Uint8List> _obtenerBytesExamen(String url) async {
+    if (url.startsWith('data:')) {
+      return UriData.parse(url).contentAsBytes();
+    } else {
+      final response = await http.get(Uri.parse(url)).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Timeout al descargar el examen');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      } else {
+        throw Exception('Error HTTP ${response.statusCode}');
+      }
+    }
+  }
+
   Future<void> _abrirExamen(Documento documento) async {
     if (documento.url == null) {
       _mostrarMensaje('URL del examen no disponible');
@@ -436,84 +456,48 @@ class _MisExamenesPageState extends State<MisExamenesPage> {
 
     try {
       debugPrint('📄 Abriendo examen: ${documento.nombre}');
-      debugPrint('🔗 URL: ${documento.url}');
+      _mostrarMensaje('Procesando examen...');
 
-      _mostrarMensaje('Descargando examen...');
+      final bytes = await _obtenerBytesExamen(documento.url!);
 
-      final response = await http.get(Uri.parse(documento.url!)).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('⏱️ Timeout al descargar');
-          throw Exception('Timeout al descargar el examen');
-        },
-      );
+      final directory = await getApplicationDocumentsDirectory();
+      final docsDir = Directory('${directory.path}\\Examenes');
 
-      debugPrint('📡 HTTP Status: ${response.statusCode}');
+      if (!await docsDir.exists()) {
+        await docsDir.create(recursive: true);
+      }
 
-      if (response.statusCode == 200) {
-        final directory = await getApplicationDocumentsDirectory();
-        final docsDir = Directory('${directory.path}\\Examenes');
+      final fileName = documento.nombre
+          .replaceAll(RegExp(r'[^\w\s-]'), '_')
+          .replaceAll(' ', '_');
+      
+      // Determinar extensión
+      String extension = '.pdf';
+      if (documento.url!.startsWith('data:image/png')) extension = '.png';
+      if (documento.url!.startsWith('data:image/jpeg')) extension = '.jpg';
+      if (documento.nombre.toLowerCase().endsWith('.png')) extension = '.png';
+      if (documento.nombre.toLowerCase().endsWith('.jpg')) extension = '.jpg';
+      
+      final filePath = '${docsDir.path}\\$fileName$extension';
+      final file = File(filePath);
 
-        if (!await docsDir.exists()) {
-          await docsDir.create(recursive: true);
-        }
+      await file.writeAsBytes(bytes);
+      debugPrint('✅ Examen guardado en: $filePath');
 
-        final fileName = documento.nombre
-            .replaceAll(RegExp(r'[^\w\s-]'), '_')
-            .replaceAll(' ', '_');
-        final filePath = '${docsDir.path}\\$fileName.pdf';
-        final file = File(filePath);
-
-        await file.writeAsBytes(response.bodyBytes);
-        debugPrint('✅ Examen guardado en: $filePath');
-        debugPrint('📦 Tamaño: ${response.bodyBytes.length} bytes');
-
-        if (await file.exists()) {
-          debugPrint('✓ Archivo existe, intentando abrir...');
-
-          final uri = Uri.file(filePath);
-          final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-          if (launched) {
-            _mostrarMensaje('✓ Examen abierto correctamente');
-          } else {
-            _mostrarMensaje('Examen guardado en: ${docsDir.path}');
-            await launchUrl(Uri.file(docsDir.path));
-          }
-        } else {
-          debugPrint('❌ El archivo no existe después de guardarlo');
-          _mostrarMensaje('Error: El archivo no se guardó correctamente');
-        }
-      } else {
-        debugPrint('❌ Error HTTP: ${response.statusCode}');
-        final bodyPreview = response.body.length > 200
-            ? response.body.substring(0, 200)
-            : response.body;
-        debugPrint('📝 Body: $bodyPreview');
-
-        _mostrarMensaje('Intentando abrir en navegador...');
-        final uri = Uri.parse(documento.url!);
+      if (await file.exists()) {
+        final uri = Uri.file(filePath);
         final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
 
-        if (!launched) {
-          _mostrarMensaje('No se pudo abrir el examen (HTTP ${response.statusCode})');
+        if (launched) {
+          _mostrarMensaje('✓ Examen abierto correctamente');
+        } else {
+          _mostrarMensaje('Examen guardado en: ${docsDir.path}');
+          await launchUrl(Uri.file(docsDir.path));
         }
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ Error al abrir examen: $e');
-      debugPrint('Stack trace: $stackTrace');
-
-      try {
-        _mostrarMensaje('Intentando abrir en navegador...');
-        final uri = Uri.parse(documento.url!);
-        final launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
-
-        if (!launched) {
-          _mostrarMensaje('Error: No se pudo abrir el examen\n$e');
-        }
-      } catch (e2) {
-        _mostrarMensaje('Error: $e');
-      }
+      _mostrarMensaje('Error al abrir examen: $e');
     }
   }
 
@@ -525,36 +509,35 @@ class _MisExamenesPageState extends State<MisExamenesPage> {
 
     try {
       debugPrint('💾 Descargando examen: ${documento.nombre}');
-
       _mostrarMensaje('Descargando examen...');
 
-      final response = await http.get(Uri.parse(documento.url!)).timeout(
-        const Duration(seconds: 10),
-      );
+      final bytes = await _obtenerBytesExamen(documento.url!);
 
-      if (response.statusCode == 200) {
-        final directory = await getApplicationDocumentsDirectory();
-        final docsDir = Directory('${directory.path}\\Examenes');
+      final directory = await getApplicationDocumentsDirectory();
+      final docsDir = Directory('${directory.path}\\Examenes');
 
-        if (!await docsDir.exists()) {
-          await docsDir.create(recursive: true);
-        }
-
-        final fileName = documento.nombre
-            .replaceAll(RegExp(r'[^\w\s-]'), '_')
-            .replaceAll(' ', '_');
-        final filePath = '${docsDir.path}\\$fileName.pdf';
-        final file = File(filePath);
-
-        await file.writeAsBytes(response.bodyBytes);
-        debugPrint('✅ Examen descargado: $filePath');
-
-        _mostrarMensaje('✓ Examen descargado exitosamente');
-
-        await launchUrl(Uri.file(docsDir.path));
-      } else {
-        _mostrarMensaje('Error al descargar: HTTP ${response.statusCode}');
+      if (!await docsDir.exists()) {
+        await docsDir.create(recursive: true);
       }
+
+      final fileName = documento.nombre
+          .replaceAll(RegExp(r'[^\w\s-]'), '_')
+          .replaceAll(' ', '_');
+      
+      String extension = '.pdf';
+      if (documento.url!.startsWith('data:image/png')) extension = '.png';
+      if (documento.url!.startsWith('data:image/jpeg')) extension = '.jpg';
+      if (documento.nombre.toLowerCase().endsWith('.png')) extension = '.png';
+      if (documento.nombre.toLowerCase().endsWith('.jpg')) extension = '.jpg';
+
+      final filePath = '${docsDir.path}\\$fileName$extension';
+      final file = File(filePath);
+
+      await file.writeAsBytes(bytes);
+      debugPrint('✅ Examen descargado: $filePath');
+
+      _mostrarMensaje('✓ Examen descargado exitosamente');
+      await launchUrl(Uri.file(docsDir.path));
     } catch (e) {
       _mostrarMensaje('Error al descargar examen: $e');
     }

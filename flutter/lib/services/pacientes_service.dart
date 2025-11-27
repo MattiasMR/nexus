@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/paciente.dart';
+import '../models/ficha_medica.dart';
 
 /// Servicio para gestionar operaciones CRUD de pacientes en Firestore
 class PacientesService {
@@ -46,7 +47,7 @@ class PacientesService {
     });
   }
 
-  /// Crea un nuevo paciente
+  /// Crea un nuevo paciente y sus documentos relacionados (Ficha Médica)
   Future<String> createPaciente(Paciente paciente) async {
     try {
       // Verificar si el RUT ya existe
@@ -59,14 +60,37 @@ class PacientesService {
         throw Exception('Ya existe un paciente con el RUT ${paciente.rut}');
       }
 
-      // Crear el paciente con timestamps
+      final batch = _firestore.batch();
+
+      // 1. Preparar documento de paciente
+      final pacienteDocRef = _pacientesRef.doc();
       final pacienteConTimestamps = paciente.copyWith(
+        id: pacienteDocRef.id,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
+      
+      batch.set(pacienteDocRef, pacienteConTimestamps.toFirestore());
 
-      final docRef = await _pacientesRef.add(pacienteConTimestamps.toFirestore());
-      return docRef.id;
+      // 2. Preparar ficha médica vacía
+      final fichaRef = _firestore.collection('fichas-medicas').doc();
+      final ficha = FichaMedica(
+        idPaciente: pacienteDocRef.id,
+        fechaMedica: DateTime.now(),
+        observacion: 'Ficha creada automáticamente al registrar paciente',
+        alergias: [],
+        antecedentes: Antecedentes(),
+        totalConsultas: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      batch.set(fichaRef, ficha.toFirestore());
+
+      // Ejecutar batch
+      await batch.commit();
+
+      return pacienteDocRef.id;
     } catch (e) {
       throw Exception('Error al crear paciente: $e');
     }
