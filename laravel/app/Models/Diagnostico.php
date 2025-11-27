@@ -186,7 +186,7 @@ class Diagnostico
     private function convertTimestamp($timestamp): string
     {
         if ($timestamp instanceof \Google\Cloud\Core\Timestamp) {
-            return Carbon::createFromTimestamp($timestamp->get()->getSeconds())->toIso8601String();
+            return Carbon::createFromTimestamp($timestamp->get()->getTimestamp())->toIso8601String();
         }
         
         if ($timestamp instanceof \DateTime) {

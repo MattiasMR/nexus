@@ -19,9 +19,14 @@
         </div>
         
         <div class="header-actions">
-          <ion-button (click)="nuevaConsulta()" fill="outline" class="nueva-consulta-btn">
+          <ion-button (click)="nuevaConsulta()" fill="solid" class="nueva-consulta-btn">
             <ion-icon name="add-circle" slot="start"></ion-icon>
             Nueva Consulta
+          </ion-button>
+          
+          <ion-button (click)="nuevaOrdenExamen()" fill="solid" class="nueva-orden-btn">
+            <ion-icon name="flask" slot="start"></ion-icon>
+            Nueva Orden
           </ion-button>
           
           <ion-button (click)="subirExamen()" fill="solid" class="subir-examen-btn">
@@ -29,7 +34,7 @@
             Subir Examen
           </ion-button>
           
-          <ion-button (click)="verMedicacion()" fill="outline" class="medicacion-btn">
+          <ion-button (click)="verMedicacion()" fill="solid" class="medicacion-btn">
             <ion-icon name="medical" slot="start"></ion-icon>
             Ver Medicación
           </ion-button>
@@ -51,13 +56,13 @@
             </ion-button>
           </div>
           <div *ngIf="isEditMode" class="edit-actions">
-            <ion-button (click)="guardarCambios()" fill="solid" size="small" color="success">
-              <ion-icon name="checkmark-outline" slot="start"></ion-icon>
-              Guardar
-            </ion-button>
-            <ion-button (click)="cancelarEdicion()" fill="outline" size="small" color="medium">
+            <ion-button (click)="cancelarEdicion()" fill="outline" size="small" class="btn-cancelar-edicion">
               <ion-icon name="close-outline" slot="start"></ion-icon>
               Cancelar
+            </ion-button>
+            <ion-button (click)="guardarCambios()" fill="solid" size="small" class="btn-guardar-edicion">
+              <ion-icon name="checkmark-outline" slot="start"></ion-icon>
+              Guardar
             </ion-button>
           </div>
         </div>
@@ -69,40 +74,76 @@
             <ion-col size="12" sizeMd="6">
               <div class="info-group">
                 <div class="info-item">
-                  <span class="info-label">RUT:</span>
+                  <span class="info-label">
+                    <ion-icon name="card-outline"></ion-icon>
+                    RUT
+                  </span>
                   <span class="info-value">{{ ficha?.datosPersonales?.rut }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">Edad:</span>
+                  <span class="info-label">
+                    <ion-icon name="calendar-outline"></ion-icon>
+                    Edad
+                  </span>
                   <span class="info-value">{{ ficha?.datosPersonales?.edad }} años</span>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">Tipo sanguíneo:</span>
+                <div class="info-item" [class.editing]="isEditMode">
+                  <span class="info-label">
+                    <ion-icon name="water-outline"></ion-icon>
+                    Tipo sanguíneo
+                  </span>
                   <span class="info-value blood-type" *ngIf="!isEditMode">{{ ficha?.datosPersonales?.grupoSanguineo }}</span>
-                  <ion-select *ngIf="isEditMode" [(ngModel)]="editedData.grupoSanguineo" interface="popover">
-                    <ion-select-option value="A+">A+</ion-select-option>
-                    <ion-select-option value="A-">A-</ion-select-option>
-                    <ion-select-option value="B+">B+</ion-select-option>
-                    <ion-select-option value="B-">B-</ion-select-option>
-                    <ion-select-option value="AB+">AB+</ion-select-option>
-                    <ion-select-option value="AB-">AB-</ion-select-option>
-                    <ion-select-option value="O+">O+</ion-select-option>
-                    <ion-select-option value="O-">O-</ion-select-option>
-                  </ion-select>
+                  <div class="edit-field" *ngIf="isEditMode">
+                    <ion-select 
+                      [(ngModel)]="editedData.grupoSanguineo" 
+                      interface="popover"
+                      placeholder="Seleccionar"
+                      class="custom-select">
+                      <ion-select-option value="A+">A+</ion-select-option>
+                      <ion-select-option value="A-">A-</ion-select-option>
+                      <ion-select-option value="B+">B+</ion-select-option>
+                      <ion-select-option value="B-">B-</ion-select-option>
+                      <ion-select-option value="AB+">AB+</ion-select-option>
+                      <ion-select-option value="AB-">AB-</ion-select-option>
+                      <ion-select-option value="O+">O+</ion-select-option>
+                      <ion-select-option value="O-">O-</ion-select-option>
+                    </ion-select>
+                  </div>
                 </div>
               </div>
             </ion-col>
             <ion-col size="12" sizeMd="6">
               <div class="info-group">
-                <div class="info-item">
-                  <span class="info-label">Dirección:</span>
+                <div class="info-item" [class.editing]="isEditMode">
+                  <span class="info-label">
+                    <ion-icon name="location-outline"></ion-icon>
+                    Dirección
+                  </span>
                   <span class="info-value" *ngIf="!isEditMode">{{ ficha?.datosPersonales?.direccion }}</span>
-                  <ion-input *ngIf="isEditMode" [(ngModel)]="editedData.direccion" type="text" class="edit-input"></ion-input>
+                  <div class="edit-field" *ngIf="isEditMode">
+                    <ion-input 
+                      [(ngModel)]="editedData.direccion" 
+                      type="text"
+                      placeholder="Ingrese dirección"
+                      class="custom-input">
+                    </ion-input>
+                  </div>
                 </div>
-                <div class="info-item">
-                  <span class="info-label">Contacto:</span>
+                <div class="info-item" [class.editing]="isEditMode">
+                  <span class="info-label">
+                    <ion-icon name="call-outline"></ion-icon>
+                    Contacto
+                  </span>
                   <span class="info-value" *ngIf="!isEditMode">{{ ficha?.datosPersonales?.telefono }}</span>
-                  <ion-input *ngIf="isEditMode" [(ngModel)]="editedData.telefono" type="tel" maxlength="9" class="edit-input"></ion-input>
+                  <div class="edit-field" *ngIf="isEditMode">
+                    <ion-input 
+                      [(ngModel)]="editedData.telefono" 
+                      type="tel" 
+                      maxlength="9"
+                      placeholder="Ej: 912345678"
+                      class="custom-input">
+                    </ion-input>
+                  </div>
                 </div>
               </div>
             </ion-col>
@@ -160,6 +201,66 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- SECCIÓN: Órdenes de Exámenes -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <div class="section-header">
+          <ion-icon name="flask" class="section-icon"></ion-icon>
+          <ion-card-title>Órdenes de Exámenes</ion-card-title>
+          <ion-badge color="primary">{{ ordenesExamenes.length }}</ion-badge>
+        </div>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <div *ngIf="ordenesExamenes.length === 0" class="empty-state">
+          <ion-icon name="flask-outline" style="font-size: 64px; color: #ccc;"></ion-icon>
+          <p style="color: #999; margin-top: 16px;">No hay órdenes de exámenes</p>
+          <p style="color: #999; font-size: 0.9rem;">Usa el botón "Nueva Orden" para crear una orden</p>
+        </div>
+        
+        <div class="ordenes-grid" *ngIf="ordenesExamenes.length > 0">
+          <div *ngFor="let orden of ordenesExamenes" class="orden-card">
+            <div class="orden-header">
+              <div class="orden-fecha">
+                <ion-icon name="calendar"></ion-icon>
+                <span>{{ getFechaOrden(orden.fecha) | date:'dd/MM/yyyy' }}</span>
+              </div>
+              <ion-badge [color]="getColorEstado(getEstadoOrden(orden))">
+                <ion-icon [name]="getIconoEstado(getEstadoOrden(orden))"></ion-icon>
+                {{ getEstadoOrden(orden) | titlecase }}
+              </ion-badge>
+            </div>
+            
+            <div class="orden-examenes">
+              <h4 class="orden-subtitle">Exámenes solicitados:</h4>
+              <div class="examenes-list-items">
+                <div *ngFor="let examen of orden.examenes" class="examen-item-orden">
+                  <ion-icon name="medical"></ion-icon>
+                  <div class="examen-details">
+                    <span class="examen-nombre">{{ examen.nombreExamen }}</span>
+                    <span *ngIf="examen.resultado && examen.resultado !== 'Pendiente'" class="examen-instrucciones">{{ examen.resultado }}</span>
+                  </div>
+                  <ion-icon 
+                    *ngIf="examen.documentos && examen.documentos.length > 0" 
+                    name="checkmark-circle" 
+                    class="examen-check"
+                    color="success">
+                  </ion-icon>
+                </div>
+              </div>
+            </div>
+            
+            <div class="orden-footer" *ngIf="orden.createdAt">
+              <span class="orden-id">
+                <ion-icon name="document-text"></ion-icon>
+                Orden #{{ orden.id?.substring(0, 8) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
     <!-- SECCIÓN: Alertas Médicas -->
     <ion-card class="section-card">
       <ion-card-header>
@@ -203,15 +304,34 @@
       <ion-card-header>
         <div class="section-header">
           <ion-icon name="pulse" class="section-icon evolution-icon"></ion-icon>
-          <ion-card-title>Historial Médico Completo</ion-card-title>
+          <ion-card-title>Historial Médico</ion-card-title>
+          <div class="historial-badge" *ngIf="timelineItems.length > 0">
+            {{ timelineItems.length }} registro{{ timelineItems.length !== 1 ? 's' : '' }}
+          </div>
         </div>
       </ion-card-header>
       
       <ion-card-content>
         <app-timeline 
-          [items]="timelineItems"
+          [items]="timelineItemsVisible"
           [emptyMessage]="'No hay consultas o exámenes registrados'">
         </app-timeline>
+        
+        <!-- Botón expandir/contraer -->
+        <div class="expandir-container" *ngIf="hayMasItems">
+          <button class="btn-expandir" (click)="toggleHistorial()">
+            <span *ngIf="!historialExpandido">
+              Ver todos los registros ({{ timelineItems.length }})
+            </span>
+            <span *ngIf="historialExpandido">
+              Ver menos
+            </span>
+            <ion-icon 
+              [name]="historialExpandido ? 'chevron-up-outline' : 'chevron-down-outline'"
+              class="icono-expandir">
+            </ion-icon>
+          </button>
+        </div>
       </ion-card-content>
     </ion-card>
 
@@ -225,65 +345,99 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- SECCIÓN: Exámenes y Resultados (resumen) -->
+    <!-- SECCIÓN: Notas Rápidas -->
     <ion-card class="section-card">
       <ion-card-header>
         <div class="section-header">
-          <ion-icon name="flask" class="section-icon examenes-icon"></ion-icon>
-          <ion-card-title>Resumen Exámenes y Resultados</ion-card-title>
+          <ion-icon name="document-text" class="section-icon notas-icon"></ion-icon>
+          <ion-card-title>Notas</ion-card-title>
+          <ion-badge color="primary">{{ notas.length }}</ion-badge>
+          <ion-button (click)="nuevaNota()" fill="solid" size="small" class="nueva-nota-btn">
+            <ion-icon name="add" slot="start"></ion-icon>
+            Nueva Nota
+          </ion-button>
         </div>
       </ion-card-header>
+      
       <ion-card-content>
-        <div class="examenes-list">
-          <div *ngFor="let examen of ficha?.examenes" class="examen-item">
-            <div class="examen-header">
-              <div class="examen-info">
-                <h4 class="examen-name">{{ examen.nombre }}</h4>
-                <span class="examen-date">{{ formatDateShort(examen.fecha) }}</span>
+        <div *ngIf="notas.length === 0" class="empty-state">
+          <ion-icon name="document-text-outline" style="font-size: 64px; color: #ccc;"></ion-icon>
+          <p style="color: #999; margin-top: 16px;">No hay notas registradas</p>
+          <p style="color: #999; font-size: 0.9rem;">Usa el botón "Nueva Nota" para agregar una</p>
+        </div>
+        
+        <div class="notas-list" *ngIf="notas.length > 0">
+          <div *ngFor="let nota of notas" class="nota-card">
+            <div class="nota-header">
+              <div class="nota-fecha">
+                <ion-icon name="calendar"></ion-icon>
+                <span>{{ getFechaOrden(nota.fecha) | date:'dd/MM/yyyy HH:mm' }}</span>
               </div>
-              <ion-badge [color]="getExamenBadgeColor(examen.estado)" class="examen-badge">
-                {{ getExamenBadgeText(examen.estado) }}
-              </ion-badge>
+              <button class="icon-btn delete-btn" (click)="eliminarNota(nota)" title="Eliminar nota">
+                <ion-icon name="trash"></ion-icon>
+              </button>
             </div>
-            <div class="examen-result">
-              <span>{{ examen.resultado }}</span>
+            
+            <div class="nota-contenido">
+              <p>{{ nota.contenido }}</p>
+            </div>
+            
+            <div class="nota-footer" *ngIf="nota.tipoAsociacion && nota.nombreAsociado">
+              <ion-badge [color]="nota.tipoAsociacion === 'consulta' ? 'primary' : nota.tipoAsociacion === 'orden' ? 'secondary' : 'tertiary'">
+                <ion-icon [name]="nota.tipoAsociacion === 'consulta' ? 'medical' : nota.tipoAsociacion === 'orden' ? 'flask' : 'document'"></ion-icon>
+                {{ nota.nombreAsociado }}
+              </ion-badge>
             </div>
           </div>
         </div>
       </ion-card-content>
     </ion-card>
 
-    <!-- SECCIÓN: Notas Rápidas -->
-    <ion-card class="section-card">
-      <ion-card-header>
-        <div class="section-header">
-          <ion-icon name="document-outline" class="section-icon notas-icon"></ion-icon>
-          <ion-card-title>Notas Rápidas</ion-card-title>
-        </div>
-      </ion-card-header>
-      
-      <ion-card-content>
-        <div class="notas-container">
-          <ion-textarea
-            [(ngModel)]="nuevaNota"
-            placeholder="Agregar nota rápida sobre el paciente..."
-            rows="4"
-            fill="outline"
-            class="nota-textarea">
-          </ion-textarea>
-          
-          <ion-button 
-            (click)="agregarNota()"
-            [disabled]="!nuevaNota.trim()"
-            color="primary"
-            class="agregar-nota-btn">
-            <ion-icon name="add" slot="start"></ion-icon>
-            Agregar Nota
-          </ion-button>
-        </div>
-      </ion-card-content>
-    </ion-card>
+  </div>
 
+  <!-- Popup para Nueva Nota -->
+  <div *ngIf="showNotaPopup" class="popup-overlay" (click)="cerrarPopupNota()">
+    <div class="popup-content" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Nueva Nota</h2>
+        <button class="close-btn" (click)="cerrarPopupNota()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <p class="patient-info">Paciente: {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</p>
+        
+        <div class="form-group">
+          <label for="contenidoNota">Contenido de la Nota *</label>
+          <textarea 
+            id="contenidoNota"
+            [(ngModel)]="datosNuevaNota.contenido"
+            placeholder="Escribe aquí la nota..."
+            rows="6"
+            class="form-input"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="asociacionNota">Asociar con (Opcional)</label>
+          <ion-select 
+            interface="action-sheet"
+            placeholder="Selecciona una consulta u orden"
+            (ionChange)="onAsociacionChange($event)"
+            class="form-input">
+            <ion-select-option value="">Sin asociar</ion-select-option>
+            <ion-select-option *ngFor="let opcion of getOpcionesAsociacion()" [value]="opcion.tipo + '-' + opcion.id">
+              {{ opcion.nombre }}
+            </ion-select-option>
+          </ion-select>
+        </div>
+      </div>
+
+      <div class="popup-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarPopupNota()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarNota()">Guardar Nota</button>
+      </div>
+    </div>
   </div>
 
   <!-- Popup para Nueva Consulta -->
@@ -554,6 +708,79 @@
     </div>
   </div>
 
+  <!-- Popup Nueva Orden de Examen -->
+  <div *ngIf="showOrdenPopup" class="popup-overlay" (click)="cerrarPopupOrden()">
+    <div class="popup-content orden-popup" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h2>Nueva Orden de Examen</h2>
+        <button class="close-btn" (click)="cerrarPopupOrden()">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      
+      <div class="popup-body">
+        <p class="patient-info">Paciente: {{ ficha?.datosPersonales?.nombres }} {{ ficha?.datosPersonales?.apellidos }}</p>
+        
+        <div class="examenes-list">
+          <div class="examenes-header">
+            <h3>Exámenes Solicitados</h3>
+            <button type="button" class="btn-add-examen" (click)="agregarExamen()">
+              <ion-icon name="add-circle"></ion-icon>
+              Agregar Examen
+            </button>
+          </div>
+
+          <div *ngFor="let examen of datosNuevaOrden.examenes; let i = index" class="examen-item">
+            <div class="examen-header">
+              <span class="examen-numero">Examen {{ i + 1 }}</span>
+              <button *ngIf="datosNuevaOrden.examenes.length > 1" 
+                      type="button" 
+                      class="btn-remove-examen" 
+                      (click)="eliminarExamen(i)">
+                <ion-icon name="trash"></ion-icon>
+              </button>
+            </div>
+
+            <div class="form-group">
+              <label [for]="'nombreExamen' + i">Nombre del Examen *</label>
+              <input 
+                type="text" 
+                [id]="'nombreExamen' + i"
+                [(ngModel)]="examen.nombre"
+                placeholder="Ej: Hemograma completo, Radiografía de tórax..."
+                class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label [for]="'instruccionesExamen' + i">Instrucciones</label>
+              <textarea 
+                [id]="'instruccionesExamen' + i"
+                [(ngModel)]="examen.instrucciones"
+                placeholder="Indicaciones especiales para el examen..."
+                rows="3"
+                class="form-input"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="observacionesOrden">Observaciones Generales</label>
+          <textarea 
+            id="observacionesOrden"
+            [(ngModel)]="datosNuevaOrden.observaciones"
+            placeholder="Información adicional sobre la orden..."
+            rows="3"
+            class="form-input"></textarea>
+        </div>
+      </div>
+
+      <div class="popup-actions">
+        <button type="button" class="btn-secondary" (click)="cerrarPopupOrden()">Cancelar</button>
+        <button type="button" class="btn-primary" (click)="guardarNuevaOrden()">Crear Orden</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Visor de Archivos -->
   <div *ngIf="archivoViendose" class="archivo-viewer-overlay" (click)="cerrarVisorArchivo()">
     <div class="archivo-viewer-content" (click)="$event.stopPropagation()">
@@ -661,6 +888,34 @@
           <span>Tamaño: {{ formatFileSize(archivoViendose.tamanio) }}</span>
           <span>Fecha: {{ archivoViendose.fechaSubida?.toDate ? (archivoViendose.fechaSubida.toDate() | date:'dd/MM/yyyy HH:mm') : (archivoViendose.fechaSubida | date:'dd/MM/yyyy HH:mm') }}</span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup de Confirmación de Eliminación -->
+  <div class="confirmacion-eliminar-overlay" *ngIf="mostrarConfirmacionEliminar" (click)="cancelarEliminacion()">
+    <div class="confirmacion-eliminar-modal" (click)="$event.stopPropagation()">
+      <div class="confirmacion-header">
+        <div class="icono-warning">
+          <ion-icon name="warning-outline"></ion-icon>
+        </div>
+        <h3>¿Eliminar archivo?</h3>
+      </div>
+      
+      <div class="confirmacion-body">
+        <p class="archivo-nombre">{{ archivoAEliminar?.nombre }}</p>
+        <p class="mensaje-warning">Esta acción no se puede deshacer. El archivo será eliminado permanentemente.</p>
+      </div>
+      
+      <div class="confirmacion-footer">
+        <button class="btn-cancelar" (click)="cancelarEliminacion()">
+          <ion-icon name="close-outline"></ion-icon>
+          Cancelar
+        </button>
+        <button class="btn-eliminar" (click)="confirmarEliminacion()">
+          <ion-icon name="trash-outline"></ion-icon>
+          Eliminar
+        </button>
       </div>
     </div>
   </div>

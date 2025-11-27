@@ -92,14 +92,26 @@ class DashboardController extends Controller
             // KPI 8: Alertas críticas
             $alertasCriticas = 0;
             $pacientesConAlertas = [];
+            $usuarioModel = new \App\Models\Usuario();
+            
             foreach ($pacientes as $paciente) {
                 if (isset($paciente['alertasMedicas']) && is_array($paciente['alertasMedicas'])) {
+                    // Obtener datos del usuario vinculado
+                    $usuario = null;
+                    if (isset($paciente['idUsuario'])) {
+                        try {
+                            $usuario = $usuarioModel->find($paciente['idUsuario']);
+                        } catch (\Exception $e) {
+                            // Usuario no encontrado
+                        }
+                    }
+                    
                     foreach ($paciente['alertasMedicas'] as $alerta) {
                         if (in_array($alerta['severidad'] ?? '', ['critica', 'alta'])) {
                             $alertasCriticas++;
                             $pacientesConAlertas[] = [
-                                'paciente' => $paciente['nombre'] . ' ' . $paciente['apellido'],
-                                'rut' => $paciente['rut'] ?? 'N/A',
+                                'paciente' => $usuario ? ($usuario['displayName'] ?? 'Paciente') : 'Paciente desconocido',
+                                'rut' => $usuario ? ($usuario['rut'] ?? 'N/A') : 'N/A',
                                 'descripcion' => $alerta['descripcion'] ?? 'Sin descripción',
                                 'severidad' => $alerta['severidad'] ?? 'media',
                                 'fecha' => isset($alerta['fecha']) ? Carbon::parse($alerta['fecha'])->format('d/m/Y') : 'N/A',
@@ -170,12 +182,27 @@ class DashboardController extends Controller
                 return $fechaB->timestamp - $fechaA->timestamp;
             });
 
+            $usuarioModel = new \App\Models\Usuario();
+            
             foreach (array_slice($consultasOrdenadas, 0, 10) as $consulta) {
-                // Buscar el paciente
+                // Buscar el paciente y su usuario vinculado
                 $paciente = null;
+                $usuario = null;
+                $nombrePaciente = 'Paciente desconocido';
+                
                 if (isset($consulta['pacienteId'])) {
                     try {
                         $paciente = $pacienteModel->find($consulta['pacienteId']);
+                        
+                        // Obtener datos del usuario vinculado
+                        if ($paciente && isset($paciente['idUsuario'])) {
+                            try {
+                                $usuario = $usuarioModel->find($paciente['idUsuario']);
+                                $nombrePaciente = $usuario['displayName'] ?? 'Paciente';
+                            } catch (\Exception $e) {
+                                // Usuario no encontrado
+                            }
+                        }
                     } catch (\Exception $e) {
                         // Paciente no encontrado
                     }
@@ -183,7 +210,7 @@ class DashboardController extends Controller
 
                 $actividadReciente[] = [
                     'id' => $consulta['id'] ?? uniqid(),
-                    'paciente' => $paciente ? ($paciente['nombre'] . ' ' . $paciente['apellido']) : 'Paciente desconocido',
+                    'paciente' => $nombrePaciente,
                     'tipo' => 'Consulta Médica',
                     'motivo' => $consulta['motivoConsulta'] ?? 'Sin motivo especificado',
                     'fecha' => isset($consulta['fecha']) ? Carbon::parse($consulta['fecha'])->format('d/m/Y H:i') : 'N/A',

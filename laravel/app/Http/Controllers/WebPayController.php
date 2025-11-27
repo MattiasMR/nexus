@@ -38,21 +38,29 @@ class WebPayController extends Controller
     {
         $tiposBonos = \App\Models\Bono::tipos();
         
-        // Obtener todos los pacientes desde Firestore
-        $pacienteModel = new \App\Models\Paciente();
-        $pacientes = $pacienteModel->all();
+        // Obtener usuarios con rol paciente desde Firestore
+        $usuarioModel = new \App\Models\Usuario();
+        $todosUsuarios = $usuarioModel->all();
         
-        // Formatear pacientes para el select
+        // Filtrar solo pacientes
+        $pacientes = array_filter($todosUsuarios, function($usuario) {
+            return isset($usuario['rol']) && $usuario['rol'] === 'paciente';
+        });
+        
+        // Formatear pacientes para el select con búsqueda por nombre y RUT
         $pacientesFormateados = array_map(function($paciente) {
+            $nombre = $paciente['displayName'] ?? $paciente['email'] ?? 'Sin nombre';
+            $rut = $paciente['rut'] ?? 'Sin RUT';
+            
             return [
                 'id' => $paciente['id'],
-                'nombre' => $paciente['nombre'] ?? '',
+                'nombre' => $nombre,
                 'email' => $paciente['email'] ?? '',
-                'rut' => $paciente['rut'] ?? '',
+                'rut' => $rut,
                 'telefono' => $paciente['telefono'] ?? '',
-                'label' => ($paciente['nombre'] ?? 'Sin nombre') . ' - ' . ($paciente['rut'] ?? 'Sin RUT'),
+                'label' => $nombre . ' - ' . $rut,
             ];
-        }, $pacientes);
+        }, array_values($pacientes));
         
         return \Inertia\Inertia::render('ComprarBono', [
             'tiposBonos' => $tiposBonos,
@@ -66,6 +74,8 @@ class WebPayController extends Controller
     public function iniciarTransaccion(Request $request)
     {
         try {
+            Log::info('🔵 Iniciando transacción WebPay', ['request_data' => $request->all()]);
+            
             // Validar los datos del formulario
             $validated = $request->validate([
                 'tipo_bono' => 'required|string',
@@ -75,15 +85,21 @@ class WebPayController extends Controller
                 'telefono' => 'required|string|max:15',
                 'monto' => 'required|numeric|min:50|max:1000000',
             ]);
+            
+            Log::info('✅ Datos validados correctamente', ['validated' => $validated]);
 
             // Obtener información del bono
             $bono = \App\Models\Bono::obtenerPorId($validated['tipo_bono']);
             if (!$bono) {
+                Log::error('❌ Tipo de bono no válido', ['tipo_bono' => $validated['tipo_bono']]);
                 return back()->withErrors(['tipo_bono' => 'Tipo de bono no válido']);
             }
+            
+            Log::info('✅ Bono encontrado', ['bono' => $bono]);
 
             // Generar un número de orden único
             $buyOrder = 'BONO-' . time() . '-' . rand(1000, 9999);
+            Log::info('📋 Orden generada', ['buy_order' => $buyOrder]);
             
             // Guardar los datos en la sesión para recuperarlos después
             session([
@@ -100,20 +116,36 @@ class WebPayController extends Controller
                     'buy_order' => $buyOrder,
                 ]
             ]);
+            
+            Log::info('💾 Datos guardados en sesión');
 
             // Crear la transacción en WebPay
             $amount = (int) $validated['monto']; // El monto debe ser entero (sin decimales)
             $sessionId = session()->getId();
-            $returnUrl = route('webpay.confirmar');
+            $returnUrl = route('comprar-bono.confirmar');
+            
+            Log::info('🔧 Parámetros para WebPay', [
+                'amount' => $amount,
+                'session_id' => $sessionId,
+                'return_url' => $returnUrl,
+                'buy_order' => $buyOrder,
+            ]);
 
             $response = (new Transaction($this->getWebpayOptions()))
                 ->create($buyOrder, $sessionId, $amount, $returnUrl);
+            
+            Log::info('✅ Transacción creada en WebPay', [
+                'token' => $response->getToken(),
+                'url' => $response->getUrl(),
+            ]);
 
             // Guardar el token en la sesión
             session(['webpay_token' => $response->getToken()]);
 
             // Construir URL completa de WebPay
             $webpayUrl = $response->getUrl() . '?token_ws=' . $response->getToken();
+            
+            Log::info('🚀 Redirigiendo a WebPay', ['url' => $webpayUrl]);
 
             // Si es una petición Inertia, devolver respuesta especial para redirección externa
             if ($request->header('X-Inertia')) {
@@ -124,7 +156,12 @@ class WebPayController extends Controller
             return redirect($webpayUrl);
 
         } catch (\Exception $e) {
-            Log::error('Error al iniciar transacción WebPay: ' . $e->getMessage());
+            Log::error('❌ Error al iniciar transacción WebPay', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return back()->with('error', 'Error al iniciar la transacción: ' . $e->getMessage());
         }
     }
@@ -135,21 +172,36 @@ class WebPayController extends Controller
     public function confirmarTransaccion(Request $request)
     {
         try {
+            Log::info('🔵 Confirmando transacción WebPay', ['request_data' => $request->all()]);
+            
             $token = $request->get('token_ws');
             
             if (!$token) {
-                return redirect()->route('webpay.form')->with('error', 'Token no encontrado');
+                Log::error('❌ Token no encontrado en la petición');
+                return redirect()->route('comprar-bono')->with('error', 'Token no encontrado');
             }
+            
+            Log::info('🔑 Token recibido', ['token' => $token]);
 
             // Confirmar la transacción
+            Log::info('📞 Llamando a WebPay para confirmar transacción...');
             $response = (new Transaction($this->getWebpayOptions()))
                 ->commit($token);
+            
+            Log::info('✅ Respuesta de WebPay recibida', [
+                'buy_order' => $response->getBuyOrder(),
+                'status' => $response->getStatus(),
+                'response_code' => $response->getResponseCode(),
+                'approved' => $response->isApproved(),
+            ]);
 
             // Obtener los datos del paciente de la sesión
             $datosPaciente = session('webpay_datos_paciente', []);
+            Log::info('💾 Datos del paciente desde sesión', ['datos_encontrados' => !empty($datosPaciente)]);
 
             // Determinar si la transacción fue exitosa
             $isApproved = $response->isApproved();
+            Log::info($isApproved ? '✅ Transacción APROBADA' : '❌ Transacción RECHAZADA');
 
             // Preparar los datos para la vista
             $resultado = [
@@ -172,6 +224,7 @@ class WebPayController extends Controller
 
             // Guardar el resultado en la sesión para poder descargarlo
             session(['webpay_resultado' => array_merge($resultado, $datosPaciente)]);
+            Log::info('💾 Resultado guardado en sesión');
 
             return \Inertia\Inertia::render('ResultadoBono', [
                 'resultado' => $resultado,
@@ -179,8 +232,13 @@ class WebPayController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error al confirmar transacción WebPay: ' . $e->getMessage());
-            return redirect()->route('webpay.form')->with('error', 'Error al confirmar la transacción: ' . $e->getMessage());
+            Log::error('❌ Error al confirmar transacción WebPay', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return redirect()->route('comprar-bono')->with('error', 'Error al confirmar la transacción: ' . $e->getMessage());
         }
     }
 
