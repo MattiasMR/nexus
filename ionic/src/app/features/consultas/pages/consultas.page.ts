@@ -28,7 +28,7 @@ import { NuevaConsultaModalComponent } from '../components/nueva-consulta-modal/
 import { TimelineComponent, TimelineItem } from '../../../shared/components/timeline/timeline.component';
 
 // Modelos
-import { Paciente } from '../../../models/paciente.model';
+import { Paciente, PacienteCompleto } from '../../../models/paciente.model';
 import { FichaMedica } from '../../../models/ficha-medica.model';
 import { Consulta } from '../../../models/consulta.model';
 import { OrdenExamen } from '../../../models/orden-examen.model';
@@ -108,7 +108,7 @@ export class ConsultasPage implements OnInit, OnDestroy {
   // Estados del componente
   ficha: FichaMedicaUI | null = null;
   fichaId: string | null = null;
-  paciente: Paciente | null = null;
+  paciente: PacienteCompleto | null = null;
   isLoading = false;
   error: string | null = null;
   patientId: string | null = null;
@@ -307,18 +307,18 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Construir la ficha médica UI a partir de los datos de Firestore
    */
   private buildFichaMedicaUI(
-    paciente: Paciente,
+    paciente: PacienteCompleto,
     ficha: FichaMedica,
     consultas: Consulta[],
     examenes: OrdenExamen[]
   ): FichaMedicaUI {
     const datosPersonales = {
-      nombres: paciente.nombre || 'Sin nombre',
-      apellidos: paciente.apellido || 'Sin apellido',
+      nombres: paciente.nombre || paciente.displayName?.split(' ')[0] || 'Sin nombre',
+      apellidos: paciente.apellido || paciente.displayName?.split(' ').slice(1).join(' ') || 'Sin apellido',
       rut: paciente.rut || 'Sin RUT',
       edad: this.calculateAge(paciente.fechaNacimiento),
       grupoSanguineo: paciente.grupoSanguineo || 'No registrado',
-      direccion: paciente.direccion || 'Sin dirección',
+      direccion: 'Sin dirección',  // direccion no está en el nuevo modelo
       telefono: paciente.telefono || 'Sin teléfono',
       contactoEmergencia: 'Contacto por definir' // TODO: Add to Paciente model
     };
