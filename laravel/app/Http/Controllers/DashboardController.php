@@ -90,36 +90,101 @@ class DashboardController extends Controller
             }
 
             // KPI 8: Alertas críticas
+            logger()->info('🔍 [Dashboard] Procesando alertas críticas...');
             $alertasCriticas = 0;
             $pacientesConAlertas = [];
             $usuarioModel = new \App\Models\Usuario();
             
             foreach ($pacientes as $paciente) {
                 if (isset($paciente['alertasMedicas']) && is_array($paciente['alertasMedicas'])) {
+                    logger()->info('📋 [Dashboard] Procesando alertas de paciente', [
+                        'idPaciente' => $paciente['id'] ?? 'sin-id',
+                        'nombre' => $paciente['nombre'] ?? null,
+                        'apellido' => $paciente['apellido'] ?? null,
+                        'idUsuario' => $paciente['idUsuario'] ?? null,
+                        'cantidadAlertas' => count($paciente['alertasMedicas'])
+                    ]);
+                    
                     // Obtener datos del usuario vinculado
                     $usuario = null;
                     if (isset($paciente['idUsuario'])) {
                         try {
                             $usuario = $usuarioModel->find($paciente['idUsuario']);
+                            logger()->info('👤 [Dashboard] Usuario encontrado', [
+                                'idUsuario' => $paciente['idUsuario'],
+                                'displayName' => $usuario['displayName'] ?? null,
+                                'rut' => $usuario['rut'] ?? null
+                            ]);
                         } catch (\Exception $e) {
-                            // Usuario no encontrado
+                            logger()->warning('⚠️ [Dashboard] Usuario no encontrado', [
+                                'idUsuario' => $paciente['idUsuario'],
+                                'error' => $e->getMessage()
+                            ]);
                         }
+                    } else {
+                        logger()->warning('⚠️ [Dashboard] Paciente sin idUsuario vinculado', [
+                            'idPaciente' => $paciente['id'] ?? 'sin-id'
+                        ]);
+                    }
+                    
+                    // Construir nombre completo del paciente
+                    $nombrePaciente = 'Paciente desconocido';
+                    $nombreDesdePaciente = '';
+                    
+                    if (isset($paciente['nombre']) || isset($paciente['apellido'])) {
+                        $nombreDesdePaciente = trim(($paciente['nombre'] ?? '') . ' ' . ($paciente['apellido'] ?? ''));
+                    }
+                    
+                    // Si tiene nombre válido desde paciente, usarlo
+                    if (!empty($nombreDesdePaciente)) {
+                        $nombrePaciente = $nombreDesdePaciente;
+                        logger()->info('✅ [Dashboard] Nombre desde datos del paciente', ['nombre' => $nombrePaciente]);
+                    }
+                    // Si no, buscar en usuario
+                    elseif ($usuario && isset($usuario['displayName'])) {
+                        $nombrePaciente = $usuario['displayName'];
+                        logger()->info('✅ [Dashboard] Nombre desde usuario vinculado', ['nombre' => $nombrePaciente]);
+                    }
+                    else {
+                        logger()->warning('❌ [Dashboard] No se pudo determinar nombre del paciente', [
+                            'idPaciente' => $paciente['id'] ?? 'sin-id',
+                            'tienePacienteNombre' => isset($paciente['nombre']),
+                            'tienePacienteApellido' => isset($paciente['apellido']),
+                            'tieneUsuario' => !is_null($usuario),
+                            'tieneUsuarioDisplayName' => $usuario ? isset($usuario['displayName']) : false,
+                            'usuarioKeys' => $usuario ? array_keys($usuario) : []
+                        ]);
+                    }
+                    
+                    // Obtener RUT
+                    $rut = 'N/A';
+                    if ($usuario && isset($usuario['rut'])) {
+                        $rut = $usuario['rut'];
                     }
                     
                     foreach ($paciente['alertasMedicas'] as $alerta) {
                         if (in_array($alerta['severidad'] ?? '', ['critica', 'alta'])) {
                             $alertasCriticas++;
                             $pacientesConAlertas[] = [
-                                'paciente' => $usuario ? ($usuario['displayName'] ?? 'Paciente') : 'Paciente desconocido',
-                                'rut' => $usuario ? ($usuario['rut'] ?? 'N/A') : 'N/A',
+                                'paciente' => $nombrePaciente,
+                                'rut' => $rut,
                                 'descripcion' => $alerta['descripcion'] ?? 'Sin descripción',
                                 'severidad' => $alerta['severidad'] ?? 'media',
                                 'fecha' => isset($alerta['fecha']) ? Carbon::parse($alerta['fecha'])->format('d/m/Y') : 'N/A',
                             ];
+                            logger()->info('🚨 [Dashboard] Alerta agregada', [
+                                'paciente' => $nombrePaciente,
+                                'severidad' => $alerta['severidad'] ?? 'media'
+                            ]);
                         }
                     }
                 }
             }
+            
+            logger()->info('✅ [Dashboard] Alertas procesadas', [
+                'total' => $alertasCriticas,
+                'mostradas' => count($pacientesConAlertas)
+            ]);
 
             // Estadísticas para el dashboard
             $stats = [
@@ -174,6 +239,7 @@ class DashboardController extends Controller
             ];
 
             // Actividad reciente (últimas 10 consultas)
+            logger()->info('📅 [Dashboard] Procesando actividad reciente...');
             $actividadReciente = [];
             $consultasOrdenadas = $consultas;
             usort($consultasOrdenadas, function($a, $b) {
@@ -182,30 +248,92 @@ class DashboardController extends Controller
                 return $fechaB->timestamp - $fechaA->timestamp;
             });
 
+            logger()->info('📊 [Dashboard] Consultas ordenadas', [
+                'total' => count($consultasOrdenadas),
+                'mostrar' => min(10, count($consultasOrdenadas))
+            ]);
+
             $usuarioModel = new \App\Models\Usuario();
             
             foreach (array_slice($consultasOrdenadas, 0, 10) as $consulta) {
+                logger()->info('🔍 [Dashboard] Procesando consulta', [
+                    'idConsulta' => $consulta['id'] ?? 'sin-id',
+                    'pacienteId' => $consulta['pacienteId'] ?? null,
+                    'idPaciente' => $consulta['idPaciente'] ?? null
+                ]);
+                
                 // Buscar el paciente y su usuario vinculado
                 $paciente = null;
                 $usuario = null;
                 $nombrePaciente = 'Paciente desconocido';
                 
-                if (isset($consulta['pacienteId'])) {
+                // Intentar con ambos campos posibles
+                $pacienteId = $consulta['pacienteId'] ?? $consulta['idPaciente'] ?? null;
+                
+                if ($pacienteId) {
                     try {
-                        $paciente = $pacienteModel->find($consulta['pacienteId']);
+                        $paciente = $pacienteModel->find($pacienteId);
+                        logger()->info('📋 [Dashboard] Paciente encontrado', [
+                            'idPaciente' => $pacienteId,
+                            'nombre' => $paciente['nombre'] ?? null,
+                            'apellido' => $paciente['apellido'] ?? null,
+                            'idUsuario' => $paciente['idUsuario'] ?? null
+                        ]);
                         
-                        // Obtener datos del usuario vinculado
-                        if ($paciente && isset($paciente['idUsuario'])) {
-                            try {
-                                $usuario = $usuarioModel->find($paciente['idUsuario']);
-                                $nombrePaciente = $usuario['displayName'] ?? 'Paciente';
-                            } catch (\Exception $e) {
-                                // Usuario no encontrado
+                        if ($paciente) {
+                            // Intentar construir nombre desde datos del paciente
+                            $nombreDesdePariente = '';
+                            if (isset($paciente['nombre']) || isset($paciente['apellido'])) {
+                                $nombreDesdePariente = trim(($paciente['nombre'] ?? '') . ' ' . ($paciente['apellido'] ?? ''));
+                            }
+                            
+                            // Si tiene nombre válido desde paciente, usarlo
+                            if (!empty($nombreDesdePariente)) {
+                                $nombrePaciente = $nombreDesdePariente;
+                                logger()->info('✅ [Dashboard] Nombre desde paciente', ['nombre' => $nombrePaciente]);
+                            }
+                            // Si no, buscar en usuario
+                            elseif (isset($paciente['idUsuario'])) {
+                                try {
+                                    $usuario = $usuarioModel->find($paciente['idUsuario']);
+                                    if ($usuario && isset($usuario['displayName'])) {
+                                        $nombrePaciente = $usuario['displayName'];
+                                        logger()->info('✅ [Dashboard] Nombre desde usuario', ['nombre' => $nombrePaciente]);
+                                    } else {
+                                        logger()->warning('⚠️ [Dashboard] Usuario sin displayName', [
+                                            'idUsuario' => $paciente['idUsuario'],
+                                            'usuarioKeys' => $usuario ? array_keys($usuario) : []
+                                        ]);
+                                    }
+                                } catch (\Exception $e) {
+                                    logger()->warning('⚠️ [Dashboard] Error buscando usuario', [
+                                        'idUsuario' => $paciente['idUsuario'],
+                                        'error' => $e->getMessage()
+                                    ]);
+                                }
+                            }
+                            
+                            if ($nombrePaciente === 'Paciente desconocido') {
+                                logger()->warning('❌ [Dashboard] No se pudo determinar nombre', [
+                                    'idPaciente' => $pacienteId,
+                                    'tienePacienteNombre' => isset($paciente['nombre']),
+                                    'tienePacienteApellido' => isset($paciente['apellido']),
+                                    'tieneIdUsuario' => isset($paciente['idUsuario'])
+                                ]);
                             }
                         }
                     } catch (\Exception $e) {
+                        logger()->error('❌ [Dashboard] Error buscando paciente', [
+                            'pacienteId' => $pacienteId,
+                            'error' => $e->getMessage()
+                        ]);
                         // Paciente no encontrado
                     }
+                } else {
+                    logger()->warning('⚠️ [Dashboard] Consulta sin pacienteId/idPaciente', [
+                        'idConsulta' => $consulta['id'] ?? 'sin-id',
+                        'keys' => array_keys($consulta)
+                    ]);
                 }
 
                 $actividadReciente[] = [
@@ -217,6 +345,10 @@ class DashboardController extends Controller
                     'fechaRelativa' => isset($consulta['fecha']) ? Carbon::parse($consulta['fecha'])->diffForHumans() : 'N/A',
                 ];
             }
+            
+            logger()->info('✅ [Dashboard] Actividad reciente procesada', [
+                'total' => count($actividadReciente)
+            ]);
 
             return Inertia::render('Dashboard', [
                 'stats' => $stats,
