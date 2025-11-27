@@ -164,7 +164,8 @@ export class PatientListPage implements OnInit, OnDestroy {
       direccion: paciente.direccion || paciente.ubicacion,
       // Status fields
       estado: (paciente as any).estado || 'activo',
-      diagnostico: (paciente as any).diagnostico || 'Sin diagnóstico registrado',
+      // diagnostico se guarda en 'observaciones' en Firestore
+      diagnostico: paciente.observaciones || 'Sin diagnóstico registrado',
       ubicacion: paciente.direccion || paciente.ubicacion || 'Sin dirección',
       ultimaVisita: this.formatDate(paciente.updatedAt),
       // Medical data
@@ -224,8 +225,11 @@ export class PatientListPage implements OnInit, OnDestroy {
   }
   
   verFicha(paciente: PacienteUI) { 
+    // Usar idPaciente (ID del documento en 'pacientes') no id (UID de usuario)
+    const patientId = paciente.idPaciente || paciente.id;
+    console.log('📋 Navegando a ficha del paciente:', patientId);
     this.router.navigate(['/tabs/tab3'], { 
-      queryParams: { patientId: paciente.id } 
+      queryParams: { patientId: patientId } 
     }); 
   }
 
@@ -324,7 +328,8 @@ export class PatientListPage implements OnInit, OnDestroy {
    */
   openEdit(paciente: PacienteUI) {
     this.isEditMode = true;
-    this.editingPacienteId = paciente.id || null;
+    // IMPORTANTE: Usar idPaciente (ID del documento en 'pacientes') no id (UID de usuario)
+    this.editingPacienteId = paciente.idPaciente || paciente.id || null;
     
     // Pre-fill form with existing patient data - MAP ALL FIELDS
     this.newPaciente = {
@@ -343,7 +348,8 @@ export class PatientListPage implements OnInit, OnDestroy {
       estadoCivil: (paciente as any).estadoCivil || 'soltero',
       ocupacion: (paciente as any).ocupacion || '',
       estado: (paciente as any).estado || 'activo',
-      diagnostico: (paciente as any).diagnostico || '',
+      // diagnostico se guarda en 'observaciones' en Firestore
+      diagnostico: paciente.observaciones || paciente.diagnostico || '',
       // Arrays
       alergias: paciente.alergias?.join(', ') || '',
       enfermedadesCronicas: paciente.enfermedadesCronicas?.join(', ') || '',
@@ -524,17 +530,68 @@ export class PatientListPage implements OnInit, OnDestroy {
 
     try {
       if (this.isEditMode && this.editingPacienteId) {
-        // UPDATE existing patient
-        await this.pacientesService.updatePaciente(this.editingPacienteId, pacienteData);
+        // UPDATE existing patient with new architecture
+        console.log('✏️ Actualizando paciente existente con nueva arquitectura...');
+        
+        await this.pacientesService.updatePacienteCompleto(
+          this.editingPacienteId,
+          // Datos personales (van a 'usuarios')
+          {
+            displayName: `${nombre.trim()} ${apellido.trim()}`,
+            telefono: p.telefono?.trim()
+          },
+          // Datos médicos (van a 'pacientes')
+          {
+            fechaNacimiento: typeof p.fechaNacimiento === 'string'
+              ? Timestamp.fromDate(new Date(p.fechaNacimiento))
+              : p.fechaNacimiento,
+            sexo: (p.sexo || p.genero || 'Otro') as 'M' | 'F' | 'Otro',
+            grupoSanguineo: p.grupoSanguineo?.trim() as any,
+            observaciones: p.diagnostico?.trim() || p.observaciones
+          }
+        );
+        
         this.lastCreatedPatientId = null; // Clear temp sort
+        console.log('✅ Paciente actualizado correctamente');
       } else {
-        // CREATE new patient
-        const docId = await this.pacientesService.createPaciente(pacienteData as Omit<Paciente, 'id'>);
-        this.lastCreatedPatientId = docId; // Store for temp sorting
+        // CREATE new patient with new architecture
+        console.log('🆕 Creando nuevo paciente con arquitectura normalizada...');
+        
+        // Generate temporary password (user should change it later)
+        const tempPassword = `${rut.trim().substring(0, 8)}${Math.floor(Math.random() * 1000)}`;
+        
+        const pacienteCompleto = await this.pacientesService.createPacienteCompleto(
+          // Datos personales para usuario
+          {
+            email: p.email?.trim() || `${rut.trim()}@nexus.temp`,  // Email temporal si no se proporciona
+            password: tempPassword,
+            displayName: `${nombre.trim()} ${apellido.trim()}`,
+            rut: rut.trim(),
+            telefono: p.telefono?.trim()
+          },
+          // Datos médicos para paciente
+          {
+            fechaNacimiento: typeof p.fechaNacimiento === 'string'
+              ? Timestamp.fromDate(new Date(p.fechaNacimiento))
+              : Timestamp.now(),
+            sexo: (p.sexo || p.genero || 'Otro') as 'M' | 'F' | 'Otro',
+            grupoSanguineo: p.grupoSanguineo?.trim() as any,
+            alergias: [],
+            enfermedadesCronicas: [],
+            medicamentosActuales: [],
+            prevision: 'FONASA',
+            observaciones: p.diagnostico?.trim() || 'Sin observaciones',
+            alertasMedicas: []
+          }
+        );
+        
+        this.lastCreatedPatientId = pacienteCompleto.idPaciente; // Store for temp sorting
+        
+        console.log('✅ Paciente creado:', pacienteCompleto);
         
         // Auto-create ficha medica with patient data
         await this.fichasMedicasService.createFicha({
-          idPaciente: docId,
+          idPaciente: pacienteCompleto.idPaciente,
           fechaMedica: Timestamp.now(),
           observacion: `Ficha médica de ${nombre.trim()} ${apellido.trim()}`,
           antecedentes: {
@@ -546,6 +603,8 @@ export class PatientListPage implements OnInit, OnDestroy {
           },
           totalConsultas: 0
         });
+        
+        console.log('📋 Ficha médica creada automáticamente');
       }
 
       this.loadPatients(); // Reload patient list

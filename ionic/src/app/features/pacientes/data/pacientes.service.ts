@@ -13,7 +13,9 @@ import {
   Timestamp,
   getDoc,
   getDocs,
+  setDoc,
 } from '@angular/fire/firestore';
+import { Auth, createUserWithEmailAndPassword } from '@angular/fire/auth';
 import { Observable, from } from 'rxjs';
 import { Paciente, PacienteCompleto } from '../../../models/paciente.model';
 import { Usuario } from '../../../models/usuario.model';
@@ -33,6 +35,7 @@ import { Usuario } from '../../../models/usuario.model';
 })
 export class PacientesService {
   private firestore = inject(Firestore);
+  private auth = inject(Auth);
   private pacientesCollection = 'pacientes';
   private usuariosCollection = 'usuarios';
 
@@ -288,16 +291,118 @@ export class PacientesService {
   }
 
   /**
-   * Create a new patient (REQUIERE crear usuario primero)
+   * Create a complete patient following the new architecture
+   * 
+   * FLUJO COMPLETO:
+   * 1. Crear usuario en Firebase Auth
+   * 2. Crear documento en colección 'usuarios'
+   * 3. Crear documento en colección 'pacientes' con idUsuario
+   * 4. Actualizar usuario con idPaciente
+   * 
+   * @param datosPersonales Datos personales (email, rut, displayName, telefono)
+   * @param datosMedicos Datos médicos del paciente
+   * @returns PacienteCompleto con todos los datos
+   */
+  async createPacienteCompleto(
+    datosPersonales: {
+      email: string;
+      password: string;  // Temporal para crear cuenta
+      displayName: string;
+      rut: string;
+      telefono?: string;
+    },
+    datosMedicos: Partial<Omit<Paciente, 'id' | 'idUsuario'>>
+  ): Promise<PacienteCompleto> {
+    console.log('🔄 Iniciando creación de paciente completo...');
+    
+    try {
+      // 1. Crear usuario en Firebase Auth
+      console.log('1️⃣ Creando usuario en Firebase Auth...');
+      const userCredential = await createUserWithEmailAndPassword(
+        this.auth,
+        datosPersonales.email,
+        datosPersonales.password
+      );
+      const uid = userCredential.user.uid;
+      console.log('✅ Usuario creado en Auth:', uid);
+      
+      // 2. Crear documento en colección 'usuarios'
+      console.log('2️⃣ Creando documento en colección usuarios...');
+      const usuarioData: Omit<Usuario, 'idPaciente' | 'idProfesional'> = {
+        id: uid,
+        email: datosPersonales.email,
+        displayName: datosPersonales.displayName,
+        rut: datosPersonales.rut,
+        telefono: datosPersonales.telefono,
+        rol: 'paciente',
+        activo: true,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+      
+      await setDoc(doc(this.firestore, this.usuariosCollection, uid), usuarioData);
+      console.log('✅ Documento usuario creado');
+      
+      // 3. Crear documento en colección 'pacientes'
+      console.log('3️⃣ Creando documento en colección pacientes...');
+      const pacienteData: Omit<Paciente, 'id'> = {
+        idUsuario: uid,
+        ...datosMedicos,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
+      
+      const pacienteRef = await addDoc(
+        collection(this.firestore, this.pacientesCollection),
+        pacienteData
+      );
+      const idPaciente = pacienteRef.id;
+      console.log('✅ Documento paciente creado:', idPaciente);
+      
+      // 4. Actualizar usuario con idPaciente
+      console.log('4️⃣ Actualizando usuario con idPaciente...');
+      await updateDoc(doc(this.firestore, this.usuariosCollection, uid), {
+        idPaciente: idPaciente,
+        updatedAt: Timestamp.now()
+      });
+      console.log('✅ Usuario actualizado con idPaciente');
+      
+      // 5. Retornar PacienteCompleto
+      const pacienteCompleto: PacienteCompleto = {
+        // Datos del usuario
+        id: uid,
+        email: usuarioData.email,
+        displayName: usuarioData.displayName,
+        rut: usuarioData.rut,
+        telefono: usuarioData.telefono,
+        rol: usuarioData.rol,
+        activo: usuarioData.activo,
+        
+        // Datos del paciente
+        idPaciente: idPaciente,
+        idUsuario: uid,
+        ...datosMedicos,
+        
+        // Campos de compatibilidad
+        nombre: usuarioData.displayName.split(' ')[0],
+        apellido: usuarioData.displayName.split(' ').slice(1).join(' '),
+        nombreCompleto: usuarioData.displayName
+      };
+      
+      console.log('🎉 Paciente completo creado exitosamente');
+      return pacienteCompleto;
+      
+    } catch (error: any) {
+      console.error('❌ Error al crear paciente completo:', error);
+      throw new Error(`Error al crear paciente: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a new patient (LEGACY - Solo para compatibilidad)
    * 
    * ⚠️ IMPORTANTE: Este método solo crea el documento en 'pacientes'.
-   * El usuario debe ser creado primero en Firebase Auth + Firestore.
-   * 
-   * Para crear un paciente completo, usar el flujo:
-   * 1. Crear usuario en Firebase Auth
-   * 2. Crear documento en 'usuarios'
-   * 3. Llamar a este método con idUsuario
-   * 4. Actualizar usuario con idPaciente
+   * Para crear un paciente completo con usuario, usar createPacienteCompleto()
    */
   async createPaciente(paciente: Omit<Paciente, 'id'>): Promise<string> {
     if (!paciente.idUsuario) {
@@ -333,6 +438,67 @@ export class PacientesService {
     delete updates.idUsuario;
     
     await updateDoc(docRef, updates);
+  }
+
+  /**
+   * Update complete patient data (usuarios + pacientes)
+   * 
+   * @param idPaciente ID del documento en la colección 'pacientes'
+   * @param datosPersonales Datos personales a actualizar en 'usuarios'
+   * @param datosMedicos Datos médicos a actualizar en 'pacientes'
+   */
+  async updatePacienteCompleto(
+    idPaciente: string,
+    datosPersonales?: {
+      displayName?: string;
+      telefono?: string;
+    },
+    datosMedicos?: Partial<Omit<Paciente, 'id' | 'idUsuario'>>
+  ): Promise<void> {
+    console.log('🔄 Actualizando paciente completo...', { idPaciente });
+    
+    try {
+      // 1. Obtener el documento del paciente para obtener el idUsuario
+      const pacienteDoc = await getDoc(doc(this.firestore, this.pacientesCollection, idPaciente));
+      
+      if (!pacienteDoc.exists()) {
+        throw new Error('Paciente no encontrado');
+      }
+      
+      const paciente = { id: pacienteDoc.id, ...pacienteDoc.data() } as Paciente;
+      
+      // 2. Actualizar datos en 'usuarios' si hay cambios personales
+      if (datosPersonales && Object.keys(datosPersonales).length > 0) {
+        console.log('📝 Actualizando datos personales en usuarios...');
+        await updateDoc(
+          doc(this.firestore, this.usuariosCollection, paciente.idUsuario),
+          {
+            ...datosPersonales,
+            updatedAt: Timestamp.now()
+          }
+        );
+        console.log('✅ Datos personales actualizados');
+      }
+      
+      // 3. Actualizar datos en 'pacientes' si hay cambios médicos
+      if (datosMedicos && Object.keys(datosMedicos).length > 0) {
+        console.log('🏥 Actualizando datos médicos en pacientes...');
+        await updateDoc(
+          doc(this.firestore, this.pacientesCollection, idPaciente),
+          {
+            ...datosMedicos,
+            updatedAt: Timestamp.now()
+          }
+        );
+        console.log('✅ Datos médicos actualizados');
+      }
+      
+      console.log('🎉 Paciente actualizado exitosamente');
+      
+    } catch (error: any) {
+      console.error('❌ Error al actualizar paciente completo:', error);
+      throw new Error(`Error al actualizar paciente: ${error.message}`);
+    }
   }
 
   /**
