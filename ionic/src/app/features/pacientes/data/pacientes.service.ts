@@ -63,6 +63,12 @@ export class PacientesService {
       if (usuarioDoc.exists()) {
         const usuario = { id: usuarioDoc.id, ...usuarioDoc.data() } as Usuario;
         
+        // Filtrar solo usuarios con rol 'paciente'
+        if (usuario.rol !== 'paciente') {
+          console.log(`⚠️ Usuario ${usuario.email} no es paciente (rol: ${usuario.rol}), se omite`);
+          continue;
+        }
+        
         // Combinar datos
         const pacienteCompleto: PacienteCompleto = {
           // Datos del usuario
