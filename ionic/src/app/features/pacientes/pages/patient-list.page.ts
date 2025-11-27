@@ -227,7 +227,13 @@ export class PatientListPage implements OnInit, OnDestroy {
   verFicha(paciente: PacienteUI) { 
     // Usar idPaciente (ID del documento en 'pacientes') no id (UID de usuario)
     const patientId = paciente.idPaciente || paciente.id;
-    console.log('📋 Navegando a ficha del paciente:', patientId);
+    console.log('📋 Ver Ficha - Paciente:', {
+      id: paciente.id,
+      idPaciente: paciente.idPaciente,
+      idUsuario: paciente.idUsuario,
+      patientId: patientId,
+      nombreCompleto: paciente.nombreCompleto
+    });
     this.router.navigate(['/tabs/tab3'], { 
       queryParams: { patientId: patientId } 
     }); 
