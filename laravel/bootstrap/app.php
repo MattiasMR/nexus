@@ -1,5 +1,10 @@
 <?php
 
+// Deshabilitar gRPC en Windows para evitar recursión infinita con Google Cloud Firestore
+if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+    putenv('GOOGLE_CLOUD_DISABLE_GRPC=true');
+}
+
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\CheckRole;
