@@ -842,9 +842,31 @@ export class ConsultasPage implements OnInit, OnDestroy {
         return;
       }
       
-      console.log('📝 Cargando notas para paciente:', this.patientId);
+      console.log('═════════════════════════════════════════════');
+      console.log('📝 CARGANDO NOTAS');
+      console.log('═════════════════════════════════════════════');
+      console.log('🔍 this.patientId:', this.patientId);
+      console.log('🔍 this.paciente.idPaciente:', this.paciente?.idPaciente);
+      console.log('🔍 this.paciente.id:', this.paciente?.id);
+      console.log('═════════════════════════════════════════════');
+      
       this.notas = await this.notasService.getNotasByPaciente(this.patientId);
-      console.log('✅ Notas cargadas:', this.notas.length, this.notas);
+      
+      console.log('✅ Notas cargadas:', this.notas.length);
+      if (this.notas.length > 0) {
+        console.log('📋 Detalles de notas cargadas:');
+        this.notas.forEach((nota, idx) => {
+          console.log(`  Nota ${idx + 1}:`, {
+            id: nota.id,
+            idPaciente: nota.idPaciente,
+            contenido: nota.contenido.substring(0, 50) + '...',
+            fecha: nota.fecha
+          });
+        });
+      } else {
+        console.log('⚠️ No se encontraron notas para este idPaciente');
+      }
+      console.log('═════════════════════════════════════════════');
     } catch (error) {
       console.error('❌ Error al cargar notas:', error);
     }
@@ -880,13 +902,32 @@ export class ConsultasPage implements OnInit, OnDestroy {
    * Guardar nueva nota
    */
   async guardarNota() {
-    console.log('💾 Guardando nota:', this.datosNuevaNota);
+    console.log('═════════════════════════════════════════════');
+    console.log('💾 GUARDANDO NOTA');
+    console.log('═════════════════════════════════════════════');
+    console.log('📝 Contenido:', this.datosNuevaNota);
+    console.log('🔍 this.patientId:', this.patientId);
+    console.log('🔍 this.paciente.displayName:', this.paciente?.displayName);
+    console.log('🔍 this.paciente.idPaciente:', this.paciente?.idPaciente);
+    console.log('🔍 this.paciente.id:', this.paciente?.id);
+    console.log('═════════════════════════════════════════════');
     
     if (!this.datosNuevaNota.contenido.trim()) {
       const toast = await this.toastCtrl.create({
         message: 'El contenido de la nota no puede estar vacío',
         duration: 2000,
         color: 'warning'
+      });
+      await toast.present();
+      return;
+    }
+    
+    if (!this.patientId) {
+      console.error('❌ No hay patientId para guardar nota');
+      const toast = await this.toastCtrl.create({
+        message: 'Error: No se puede guardar la nota sin un paciente seleccionado',
+        duration: 3000,
+        color: 'danger'
       });
       await toast.present();
       return;

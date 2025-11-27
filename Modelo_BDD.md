@@ -352,6 +352,50 @@ PACIENTE:
 
 ---
 
+### 6.5. **notas** (Colección Raíz - NUEVA)
+**Descripción**: Notas rápidas del personal médico asociadas a pacientes, consultas u órdenes de examen.
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `id` | string | Auto | ID del documento |
+| `idPaciente` | string | ✅ | Referencia a pacientes |
+| `idProfesional` | string | ✅ | Profesional que escribe la nota |
+| `contenido` | string | ✅ | Texto de la nota |
+| `fecha` | Timestamp | ✅ | Fecha y hora de creación |
+| `tipoAsociacion` | string | ❌ | 'consulta', 'orden-examen', 'general' |
+| `idAsociado` | string | ❌ | ID de consulta u orden asociada |
+| `nombreAsociado` | string | ❌ | Nombre descriptivo del elemento asociado |
+| `createdAt` | Timestamp | Auto | Fecha de creación |
+| `updatedAt` | Timestamp | Auto | Última actualización |
+
+**Índices**:
+- `idPaciente` + `fecha` (compuesto - REQUERIDO para orderBy)
+- `idProfesional` + `fecha` (compuesto)
+- `tipoAsociacion` (filtrado)
+- `idAsociado` (búsqueda por asociación)
+
+**Relaciones**:
+- N:1 con pacientes
+- N:1 con profesionales
+- N:1 con consultas (opcional, vía idAsociado)
+- N:1 con ordenes-examen (opcional, vía idAsociado)
+
+**Ejemplo de uso**:
+```typescript
+{
+  id: "nota123",
+  idPaciente: "Fh2byylkEBfJCxd2vD1P",
+  idProfesional: "prof456",
+  contenido: "Paciente reporta mejoría en los síntomas",
+  fecha: Timestamp.now(),
+  tipoAsociacion: "consulta",
+  idAsociado: "consulta789",
+  nombreAsociado: "Consulta - 26/11 - Control general"
+}
+```
+
+---
+
 ### 7. **examenes** (Colección Raíz - CATÁLOGO - ACTUALIZADA)
 **Descripción**: Catálogo de tipos de exámenes disponibles en el sistema.
 

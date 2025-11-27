@@ -141,6 +141,28 @@ service cloud.firestore {
     }
     
     // ============================================
+    // COLECCIÓN: notas
+    // ============================================
+    
+    match /notas/{notaId} {
+      // Lectura: El paciente puede ver sus notas
+      allow read: if isAuthenticated() 
+        && resource.data.idPaciente == request.auth.uid;
+      
+      // Escritura: Solo médicos/profesionales (desde app Ionic)
+      // Por ahora permitimos escritura autenticada para testing
+      // TODO: Restringir solo a profesionales cuando implementes auth roles
+      allow create: if isAuthenticated()
+        && request.resource.data.idPaciente != null
+        && request.resource.data.contenido != null;
+      
+      allow update: if isAuthenticated()
+        && resource.data.idPaciente == request.resource.data.idPaciente;
+      
+      allow delete: if isAuthenticated();
+    }
+    
+    // ============================================
     // COLECCIONES DE CATÁLOGOS (Solo lectura)
     // ============================================
     
