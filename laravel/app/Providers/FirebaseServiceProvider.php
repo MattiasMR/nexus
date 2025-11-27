@@ -45,8 +45,9 @@ class FirebaseServiceProvider extends ServiceProvider
                 ];
                 
                 if ($isWindows) {
-                    // Forzar REST transport en Windows
+                    // Forzar REST transport en Windows y deshabilitar gRPC explícitamente
                     $config['transport'] = 'rest';
+                    putenv('GOOGLE_CLOUD_DISABLE_GRPC=true');
                 }
                 
                 $firestoreClient = new FirestoreClient($config);
