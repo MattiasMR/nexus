@@ -67,9 +67,18 @@ class FichaResumenTab extends StatelessWidget {
             ),
             const Divider(height: 24),
             _buildInfoRow('RUT', paciente.rut),
-            _buildInfoRow('Fecha de Nacimiento', 
-              DateFormat('dd/MM/yyyy').format(paciente.fechaNacimiento)),
-            _buildInfoRow('Edad', '${_calculateAge(paciente.fechaNacimiento)} años'),
+            _buildInfoRow(
+              'Fecha de Nacimiento',
+              paciente.fechaNacimiento != null
+                  ? DateFormat('dd/MM/yyyy').format(paciente.fechaNacimiento!)
+                  : 'No registrado',
+            ),
+            _buildInfoRow(
+              'Edad',
+              paciente.fechaNacimiento != null
+                  ? '${_calculateAge(paciente.fechaNacimiento)} años'
+                  : 'No disponible',
+            ),
             _buildInfoRow('Sexo', paciente.sexo),
             _buildInfoRow('Teléfono', paciente.telefono),
             if (paciente.email != null && paciente.email!.isNotEmpty)
@@ -311,7 +320,8 @@ class FichaResumenTab extends StatelessWidget {
     );
   }
 
-  int _calculateAge(DateTime birthDate) {
+  int _calculateAge(DateTime? birthDate) {
+    if (birthDate == null) return 0;
     final now = DateTime.now();
     int age = now.year - birthDate.year;
     if (now.month < birthDate.month ||

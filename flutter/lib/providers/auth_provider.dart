@@ -1,56 +1,47 @@
 import 'package:flutter/foundation.dart';
 import '../models/usuario.dart';
+import '../models/paciente.dart';
 import '../services/auth_service.dart';
 
 /// Estados de autenticación
-enum AuthStatus {
-  initial,
-  authenticated,
-  unauthenticated,
-  loading,
-  error,
-}
+enum AuthStatus { initial, authenticated, unauthenticated, loading, error }
 
 /// Provider para gestionar el estado de autenticación (APP DE PACIENTES)
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
 
-  // Exponer auth service para acceso a métodos de preferencias
-  AuthService get authService => _authService;
-
   AuthStatus _status = AuthStatus.initial;
   Usuario? _currentUser;
+  Paciente? _currentPaciente;
   String? _errorMessage;
 
-  // Getters
   AuthStatus get status => _status;
   Usuario? get currentUser => _currentUser;
+  Paciente? get currentPaciente => _currentPaciente;
+  PacienteCompleto? get pacienteCompleto =>
+      (_currentUser != null && _currentPaciente != null)
+      ? PacienteCompleto(usuario: _currentUser!, paciente: _currentPaciente!)
+      : null;
   String? get errorMessage => _errorMessage;
-  Stream<List<Usuario>> get pacientesStream => _authService.streamAllPacientes();
 
-  bool get isAuthenticated => _status == AuthStatus.authenticated && _currentUser != null;
+  bool get isAuthenticated =>
+      _status == AuthStatus.authenticated && _currentUser != null;
   bool get isLoading => _status == AuthStatus.loading;
   bool get hasError => _status == AuthStatus.error;
 
-  /// Inicializar el provider verificando si hay sesión activa
+  Future<bool> getRememberMePreference() => _authService.getRememberMe();
+  Future<String?> getLastEmailPreference() => _authService.getLastEmail();
+
   Future<void> initialize() async {
     _status = AuthStatus.loading;
     notifyListeners();
 
     try {
-      final firebaseUser = _authService.currentFirebaseUser;
-      
-      if (firebaseUser != null) {
-        // Hay sesión activa, obtener datos del paciente
-        final usuario = await _authService.getCurrentUserData();
-        
-        if (usuario != null && usuario.activo) {
-          _currentUser = usuario;
-          _status = AuthStatus.authenticated;
-        } else {
-          await _authService.signOut();
-          _status = AuthStatus.unauthenticated;
-        }
+      final completo = await _authService.getPacienteCompleto();
+      if (completo != null) {
+        _currentUser = completo.usuario;
+        _currentPaciente = completo.paciente;
+        _status = AuthStatus.authenticated;
       } else {
         _status = AuthStatus.unauthenticated;
       }
@@ -58,12 +49,11 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Error al inicializar auth: $e');
       _status = AuthStatus.unauthenticated;
     }
-    
+
     notifyListeners();
   }
 
-  /// Iniciar sesión
-  Future<bool> signIn({
+  Future<bool> login({
     required String email,
     required String password,
     bool rememberMe = false,
@@ -73,14 +63,13 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Autenticar con Firebase
-      final usuario = await _authService.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+      final completo = await _authService.login(
+        email,
+        password,
         rememberMe: rememberMe,
       );
-
-      _currentUser = usuario;
+      _currentUser = completo.usuario;
+      _currentPaciente = completo.paciente;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -90,14 +79,13 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Error inesperado: ${e.toString()}';
+      _errorMessage = 'Error inesperado: $e';
       _status = AuthStatus.error;
       notifyListeners();
       return false;
     }
   }
 
-  /// Registrar nuevo paciente
   Future<bool> signUp({
     required String email,
     required String password,
@@ -105,15 +93,19 @@ class AuthProvider with ChangeNotifier {
     required String apellido,
     required String rut,
     required String telefono,
-    String? fechaNacimiento,
+    DateTime? fechaNacimiento,
     String? sexo,
+    String? direccion,
+    String? prevision,
+    String? contactoEmergenciaNombre,
+    String? contactoEmergenciaTelefono,
   }) async {
     _status = AuthStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final usuario = await _authService.signUpWithEmailAndPassword(
+      final completo = await _authService.signUpWithEmailAndPassword(
         email: email,
         password: password,
         nombre: nombre,
@@ -122,9 +114,13 @@ class AuthProvider with ChangeNotifier {
         telefono: telefono,
         fechaNacimiento: fechaNacimiento,
         sexo: sexo,
+        direccion: direccion,
+        prevision: prevision,
+        contactoEmergenciaNombre: contactoEmergenciaNombre,
+        contactoEmergenciaTelefono: contactoEmergenciaTelefono,
       );
-
-      _currentUser = usuario;
+      _currentUser = completo.usuario;
+      _currentPaciente = completo.paciente;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -134,81 +130,31 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Error inesperado: ${e.toString()}';
+      _errorMessage = 'Error inesperado: $e';
       _status = AuthStatus.error;
       notifyListeners();
       return false;
     }
   }
 
-  /// Iniciar sesión seleccionando un usuario existente (MVP)
-  Future<bool> signInWithUserId(String userId) async {
-    try {
-      final usuario = await _authService.getUsuarioById(userId);
-      if (usuario == null) {
-        throw AuthException('Usuario no encontrado', 'user-not-found');
-      }
-      return signInWithUsuario(usuario);
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      _status = AuthStatus.error;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Error al seleccionar usuario: ${e.toString()}';
-      _status = AuthStatus.error;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Completar inicio de sesión usando un objeto de usuario existente
-  Future<bool> signInWithUsuario(Usuario usuario) async {
-    _status = AuthStatus.loading;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      if (!usuario.activo) {
-        throw AuthException('Usuario inactivo. Contacte al administrador', 'user-inactive');
-      }
-
-      _currentUser = usuario;
-      _status = AuthStatus.authenticated;
-      notifyListeners();
-      return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      _status = AuthStatus.error;
-      notifyListeners();
-      return false;
-    } catch (e) {
-      _errorMessage = 'Error inesperado: ${e.toString()}';
-      _status = AuthStatus.error;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  /// Cerrar sesión
   Future<void> signOut() async {
     _status = AuthStatus.loading;
     notifyListeners();
 
     try {
-      await _authService.signOut();
+      await _authService.logout();
       _currentUser = null;
+      _currentPaciente = null;
       _errorMessage = null;
       _status = AuthStatus.unauthenticated;
     } catch (e) {
-      _errorMessage = 'Error al cerrar sesión: ${e.toString()}';
+      _errorMessage = 'Error al cerrar sesión: $e';
       _status = AuthStatus.error;
     }
 
     notifyListeners();
   }
 
-  /// Enviar email de recuperación de contraseña
   Future<bool> sendPasswordResetEmail(String email) async {
     try {
       await _authService.sendPasswordResetEmail(email);
@@ -218,80 +164,125 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Error al enviar email: ${e.toString()}';
+      _errorMessage = 'Error al enviar email: $e';
       notifyListeners();
       return false;
     }
   }
 
-  /// Recargar datos del usuario
   Future<void> reloadUser() async {
     if (!isAuthenticated) return;
 
     try {
-      final usuario = await _authService.getCurrentUserData();
-      if (usuario != null) {
+      final usuario = await _authService.getCurrentUser();
+      final paciente = await _authService.getCurrentPaciente();
+      if (usuario != null && paciente != null) {
         _currentUser = usuario;
+        _currentPaciente = paciente;
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('Error al recargar usuario: $e');
+      debugPrint('Error al recargar sesión: $e');
     }
   }
 
-  /// Actualizar datos del perfil del usuario autenticado
   Future<bool> updateProfile(Map<String, dynamic> updates) async {
-    if (_currentUser == null) {
-      _errorMessage = 'No hay usuario autenticado';
+    if (_currentUser == null || _currentPaciente == null) {
+      _errorMessage = 'No hay sesión activa';
       notifyListeners();
       return false;
     }
 
+    final userUpdates = <String, dynamic>{};
+    final pacienteUpdates = <String, dynamic>{};
+
+    if (updates.containsKey('displayName')) {
+      userUpdates['displayName'] = updates['displayName'];
+    }
+    if (updates.containsKey('telefono')) {
+      userUpdates['telefono'] = updates['telefono'];
+    }
+    if (updates.containsKey('rut')) {
+      userUpdates['rut'] = updates['rut'];
+    }
+
+    if (updates.containsKey('direccion')) {
+      pacienteUpdates['direccion'] = updates['direccion'];
+    }
+    if (updates.containsKey('prevision')) {
+      pacienteUpdates['prevision'] = updates['prevision'];
+    }
+
+    // Contacto de emergencia (guardar como objeto)
+    if (updates.containsKey('contactoEmergencia') ||
+        updates.containsKey('telefonoEmergencia')) {
+      final contacto = Map<String, dynamic>.from(
+        _currentPaciente?.contactoEmergencia ?? {},
+      );
+      if (updates.containsKey('contactoEmergencia')) {
+        contacto['nombre'] = updates['contactoEmergencia'];
+      }
+      if (updates.containsKey('telefonoEmergencia')) {
+        contacto['telefono'] = updates['telefonoEmergencia'];
+      }
+      pacienteUpdates['contactoEmergencia'] = contacto;
+    }
+
+    // Cualquier otro campo se envía directo a pacientes
+    for (final entry in updates.entries) {
+      if (![
+        'displayName',
+        'telefono',
+        'direccion',
+        'prevision',
+        'contactoEmergencia',
+        'telefonoEmergencia',
+      ].contains(entry.key)) {
+        pacienteUpdates[entry.key] = entry.value;
+      }
+    }
+
     try {
-      final updatedUser = await _authService.updateUserProfile(_currentUser!.id, updates);
-      _currentUser = updatedUser;
+      if (userUpdates.isNotEmpty) {
+        await _authService.updateUserProfile(
+          displayName: userUpdates['displayName'] as String?,
+          telefono: userUpdates['telefono'] as String?,
+          rut: userUpdates['rut'] as String?,
+        );
+      }
+
+      if (pacienteUpdates.isNotEmpty) {
+        await _authService.updatePacienteData(pacienteUpdates);
+      }
+
+      await reloadUser();
       _errorMessage = null;
-      notifyListeners();
       return true;
     } on AuthException catch (e) {
       _errorMessage = e.message;
       notifyListeners();
       return false;
     } catch (e) {
-      _errorMessage = 'Error al actualizar perfil: ${e.toString()}';
+      _errorMessage = 'Error al actualizar perfil: $e';
       notifyListeners();
       return false;
     }
   }
 
-  /// Limpiar mensaje de error
   void clearError() {
     _errorMessage = null;
     if (_status == AuthStatus.error) {
-      _status = _currentUser != null 
-          ? AuthStatus.authenticated 
+      _status = isAuthenticated
+          ? AuthStatus.authenticated
           : AuthStatus.unauthenticated;
     }
     notifyListeners();
   }
-  
+
   // ========== PERMISOS (PACIENTES) ==========
-  // Esta app es solo para pacientes, estos métodos siempre retornan false
-  
-  /// Hospitales del usuario (pacientes no tienen múltiples hospitales)
   List<String> get userHospitals => [];
-  
-  /// Establecer hospital activo (no aplica para pacientes)
-  void setActiveHospital(String hospitalId) {
-    // Pacientes no manejan hospitales
-  }
-  
-  /// ¿Puede ver estadísticas? (solo personal médico)
+  void setActiveHospital(String hospitalId) {}
   bool puedeVerEstadisticas() => false;
-  
-  /// ¿Puede ordenar exámenes? (solo médicos)
   bool puedeOrdenarExamenes() => false;
-  
-  /// ¿Puede recetar medicamentos? (solo médicos)
   bool puedeRecetarMedicamentos() => false;
 }

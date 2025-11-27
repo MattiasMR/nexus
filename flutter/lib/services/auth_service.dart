@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../models/usuario.dart';
+import '../models/paciente.dart';
 
 /// Excepción personalizada para errores de autenticación
 class AuthException implements Exception {
@@ -21,8 +22,15 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Keys para SharedPreferences
-  static const String _keyRememberMe = 'remember_me';
-  static const String _keyLastEmail = 'last_email';
+  static const String _prefsUserId = 'userId';
+  static const String _prefsUserRole = 'userRole';
+  static const String _prefsDisplayName = 'displayName';
+  static const String _prefsEmail = 'email';
+  static const String _prefsRut = 'rut';
+  static const String _prefsPacienteId = 'pacienteId';
+  static const String _prefsAuthToken = 'authToken';
+  static const String _prefsRemember = 'remember_me';
+  static const String _prefsLastEmail = 'last_email';
 
   /// Stream del usuario actual de Firebase Auth
   Stream<firebase_auth.User?> get authStateChanges => _auth.authStateChanges();
@@ -30,140 +38,192 @@ class AuthService {
   /// Usuario actual de Firebase Auth
   firebase_auth.User? get currentFirebaseUser => _auth.currentUser;
 
-  /// Iniciar sesión con email y contraseña (PACIENTES)
-  Future<Usuario> signInWithEmailAndPassword({
-    required String email,
-    required String password,
+  /// Login oficial (solo pacientes)
+  Future<PacienteCompleto> login(
+    String email,
+    String password, {
     bool rememberMe = false,
   }) async {
     try {
-      debugPrint('🔐 [AUTH_SERVICE] Iniciando autenticación para: $email');
-      
-      // Autenticar con Firebase Auth
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (credential.user == null) {
-        debugPrint('❌ [AUTH_SERVICE] Credential.user es null');
-        throw AuthException('No se pudo obtener el usuario');
+      final firebaseUser = credential.user;
+      if (firebaseUser == null) {
+        throw AuthException('No se pudo autenticar el usuario');
       }
 
-      debugPrint('✅ [AUTH_SERVICE] Usuario autenticado en Firebase Auth: ${credential.user!.uid}');
-
-      // Obtener datos del paciente desde Firestore
-      debugPrint('🔍 [AUTH_SERVICE] Buscando paciente en Firestore con UID: ${credential.user!.uid}');
-      final userDoc = await _firestore
-          .collection('pacientes')
-          .doc(credential.user!.uid)
+      var usuarioDoc = await _firestore
+          .collection('usuarios')
+          .doc(firebaseUser.uid)
           .get();
 
-      if (!userDoc.exists) {
-        // Si no existe en Firestore, cerrar sesión y lanzar error
-        debugPrint('❌ [AUTH_SERVICE] Documento de paciente NO existe en Firestore');
+      if (!usuarioDoc.exists) {
+        // Auto-reparación: Crear perfil si no existe (ej. usuario creado en consola)
+        final pacientesRef = _firestore.collection('pacientes');
+        final nuevoPacienteDoc = await pacientesRef.add({
+          'idUsuario': firebaseUser.uid,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'medicamentosActuales': [],
+          'alergias': [],
+        });
+
+        await _firestore.collection('usuarios').doc(firebaseUser.uid).set({
+          'email': email,
+          'displayName': firebaseUser.displayName ?? 'Usuario Nuevo',
+          'rut': '',
+          'telefono': '',
+          'rol': 'paciente',
+          'activo': true,
+          'idPaciente': nuevoPacienteDoc.id,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        usuarioDoc = await _firestore
+            .collection('usuarios')
+            .doc(firebaseUser.uid)
+            .get();
+      }
+
+      final usuario = Usuario.fromFirestore(usuarioDoc);
+
+      if (usuario.rol != 'paciente') {
         await _auth.signOut();
         throw AuthException(
-          'Usuario no encontrado en el sistema',
-          'user-not-found-firestore',
+          'Esta aplicación es solo para pacientes.',
+          'invalid-role',
         );
       }
 
-      debugPrint('✅ [AUTH_SERVICE] Documento encontrado en Firestore');
-      final usuario = Usuario.fromFirestore(userDoc);
-      debugPrint('👤 [AUTH_SERVICE] Usuario: ${usuario.nombreCompleto}, Activo: ${usuario.activo}');
-
-      // Verificar que el usuario esté activo
       if (!usuario.activo) {
-        debugPrint('❌ [AUTH_SERVICE] Usuario inactivo');
         await _auth.signOut();
         throw AuthException(
-          'Usuario inactivo. Contacte al administrador',
+          'Tu cuenta está desactivada. Contacta al administrador.',
           'user-inactive',
         );
       }
 
-      // Actualizar último acceso en Firestore
-      debugPrint('📝 [AUTH_SERVICE] Actualizando último acceso...');
-      await _firestore.collection('pacientes').doc(usuario.id).update({
-        'ultimoAcceso': FieldValue.serverTimestamp(),
-      });
-
-      // Guardar preferencias si "recordar sesión" está activado
-      if (rememberMe) {
-        await _saveLoginPreferences(email);
-      } else {
-        await _clearLoginPreferences();
+      if (usuario.idPaciente == null) {
+        await _auth.signOut();
+        throw AuthException(
+          'No existe un registro de paciente asociado.',
+          'patient-not-linked',
+        );
       }
 
-      return usuario;
+      final pacienteDoc = await _firestore
+          .collection('pacientes')
+          .doc(usuario.idPaciente)
+          .get();
+
+      if (!pacienteDoc.exists) {
+        await _auth.signOut();
+        throw AuthException(
+          'Datos médicos no encontrados para este usuario.',
+          'patient-not-found',
+        );
+      }
+
+      final paciente = Paciente.fromFirestore(pacienteDoc);
+
+      await _persistSession(
+        usuario,
+        paciente,
+        token: await firebaseUser.getIdToken(),
+        rememberMe: rememberMe,
+        emailForRemember: email,
+      );
+
+      return PacienteCompleto(usuario: usuario, paciente: paciente);
     } on firebase_auth.FirebaseAuthException catch (e) {
-      debugPrint('❌ [AUTH_SERVICE] FirebaseAuthException: ${e.code} - ${e.message}');
       throw _handleFirebaseAuthException(e);
     } catch (e) {
-      debugPrint('❌ [AUTH_SERVICE] Error genérico: $e');
       if (e is AuthException) rethrow;
       throw AuthException('Error al iniciar sesión: ${e.toString()}');
     }
   }
 
-  /// Registrar nuevo paciente
-  Future<Usuario> signUpWithEmailAndPassword({
+  /// Registro básico respetando la arquitectura normalizada
+  Future<PacienteCompleto> signUpWithEmailAndPassword({
     required String email,
     required String password,
     required String nombre,
     required String apellido,
     required String rut,
     required String telefono,
-    String? fechaNacimiento,
+    DateTime? fechaNacimiento,
     String? sexo,
+    String? direccion,
+    String? prevision,
+    String? contactoEmergenciaNombre,
+    String? contactoEmergenciaTelefono,
   }) async {
     try {
-      // Crear usuario en Firebase Auth
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      if (credential.user == null) {
+      final uid = credential.user?.uid;
+      if (uid == null) {
         throw AuthException('No se pudo crear el usuario');
       }
 
-      final uid = credential.user!.uid;
-      final now = DateTime.now();
+      final usuariosRef = _firestore.collection('usuarios').doc(uid);
+      final pacientesRef = _firestore.collection('pacientes');
 
-      // Crear documento en Firestore (colección pacientes)
-      final usuarioData = {
+      await usuariosRef.set({
         'email': email,
-        'nombre': nombre,
-        'apellido': apellido,
+        'displayName': '$nombre $apellido'.trim(),
         'rut': rut,
         'telefono': telefono,
-        'fechaNacimiento': fechaNacimiento,
-        'sexo': sexo,
+        'rol': 'paciente',
         'activo': true,
-        'createdAt': Timestamp.fromDate(now),
-        'updatedAt': Timestamp.fromDate(now),
-      };
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-      await _firestore.collection('pacientes').doc(uid).set(usuarioData);
+      final pacienteDoc = await pacientesRef.add({
+        'idUsuario': uid,
+        if (fechaNacimiento != null)
+          'fechaNacimiento': Timestamp.fromDate(fechaNacimiento),
+        'sexo': sexo,
+        'prevision': prevision,
+        'direccion': direccion,
+        'contactoEmergencia':
+            (contactoEmergenciaNombre != null ||
+                contactoEmergenciaTelefono != null)
+            ? {
+                if (contactoEmergenciaNombre != null)
+                  'nombre': contactoEmergenciaNombre,
+                if (contactoEmergenciaTelefono != null)
+                  'telefono': contactoEmergenciaTelefono,
+              }
+            : null,
+        'medicamentosActuales': [],
+        'alergias': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-      // Crear Usuario desde los datos
-      final usuario = Usuario(
-        id: uid,
-        email: email,
-        nombre: nombre,
-        apellido: apellido,
-        rut: rut,
-        telefono: telefono,
-        activo: true,
-        fechaNacimiento: fechaNacimiento,
-        sexo: sexo,
-        createdAt: now,
-        updatedAt: now,
+      await usuariosRef.update({'idPaciente': pacienteDoc.id});
+
+      final usuario = Usuario.fromFirestore(await usuariosRef.get());
+      final paciente = Paciente.fromFirestore(await pacienteDoc.get());
+
+      await _persistSession(
+        usuario,
+        paciente,
+        token: await credential.user?.getIdToken(),
+        rememberMe: true,
+        emailForRemember: email,
       );
 
-      return usuario;
+      return PacienteCompleto(usuario: usuario, paciente: paciente);
     } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleFirebaseAuthException(e);
     } catch (e) {
@@ -172,14 +232,17 @@ class AuthService {
     }
   }
 
-  /// Cerrar sesión
-  Future<void> signOut() async {
-    try {
-      await _auth.signOut();
-      // No limpiamos las preferencias para mantener "recordar sesión"
-    } catch (e) {
-      throw AuthException('Error al cerrar sesión: ${e.toString()}');
-    }
+  /// Cerrar sesión y limpiar caché
+  Future<void> logout() async {
+    await _auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsUserId);
+    await prefs.remove(_prefsUserRole);
+    await prefs.remove(_prefsDisplayName);
+    await prefs.remove(_prefsEmail);
+    await prefs.remove(_prefsRut);
+    await prefs.remove(_prefsPacienteId);
+    await prefs.remove(_prefsAuthToken);
   }
 
   /// Enviar email para restablecer contraseña
@@ -189,103 +252,160 @@ class AuthService {
     } on firebase_auth.FirebaseAuthException catch (e) {
       throw _handleFirebaseAuthException(e);
     } catch (e) {
-      throw AuthException(
-        'Error al enviar email de recuperación: ${e.toString()}',
-      );
+      throw AuthException('Error al enviar email de recuperación: $e');
     }
   }
 
-  /// Obtener datos completos del usuario actual
-  Future<Usuario?> getCurrentUserData() async {
+  Future<Usuario?> getCurrentUser() async {
     try {
-      final firebaseUser = currentFirebaseUser;
+      final firebaseUser = _auth.currentUser;
       if (firebaseUser == null) return null;
 
-      final userDoc =
-          await _firestore.collection('pacientes').doc(firebaseUser.uid).get();
-
-      if (!userDoc.exists) return null;
-
-      return Usuario.fromFirestore(userDoc);
+      final doc = await _firestore
+          .collection('usuarios')
+          .doc(firebaseUser.uid)
+          .get();
+      if (!doc.exists) return null;
+      return Usuario.fromFirestore(doc);
     } catch (e) {
-      debugPrint('Error al obtener datos del usuario: $e');
+      debugPrint('Error obteniendo usuario actual: $e');
       return null;
     }
   }
 
-  /// Stream con todos los pacientes (para selección rápida en MVP)
-  Stream<List<Usuario>> streamAllPacientes() {
-    return _firestore
-        .collection('pacientes')
-        .orderBy('nombre')
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .where((doc) => doc.exists)
-            .map(Usuario.fromFirestore)
-            .toList());
-  }
-
-  /// Obtener un paciente específico por su ID
-  Future<Usuario?> getUsuarioById(String userId) async {
-    final doc = await _firestore.collection('pacientes').doc(userId).get();
-    if (!doc.exists) return null;
-    return Usuario.fromFirestore(doc);
-  }
-
-  /// Actualizar datos del perfil del paciente autenticado
-  Future<Usuario> updateUserProfile(String userId, Map<String, dynamic> updates) async {
+  Future<Paciente?> getCurrentPaciente() async {
     try {
-      updates['updatedAt'] = Timestamp.now();
-      await _firestore.collection('pacientes').doc(userId).update(updates);
+      final prefs = await SharedPreferences.getInstance();
+      final pacienteId = prefs.getString(_prefsPacienteId);
+      if (pacienteId == null) return null;
 
-      final snapshot = await _firestore.collection('pacientes').doc(userId).get();
-      return Usuario.fromFirestore(snapshot);
-    } on FirebaseException catch (e) {
-      throw AuthException(
-        'No se pudo actualizar el perfil: ${e.message ?? e.code}',
-        e.code,
-      );
+      final doc = await _firestore
+          .collection('pacientes')
+          .doc(pacienteId)
+          .get();
+      if (!doc.exists) return null;
+      return Paciente.fromFirestore(doc);
     } catch (e) {
-      throw AuthException('Error al actualizar perfil: ${e.toString()}');
+      debugPrint('Error obteniendo paciente actual: $e');
+      return null;
     }
   }
 
-  // ========== PREFERENCIAS ==========
+  Future<PacienteCompleto?> getPacienteCompleto() async {
+    final usuario = await getCurrentUser();
+    final paciente = await getCurrentPaciente();
+    if (usuario == null || paciente == null) return null;
+    return PacienteCompleto(usuario: usuario, paciente: paciente);
+  }
 
-  /// Verificar si "recordar sesión" está activado
+  Future<bool> isAuthenticated() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefsUserId) != null && _auth.currentUser != null;
+  }
+
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefsAuthToken);
+  }
+
+  Future<void> refreshPacienteData() async {
+    final usuario = await getCurrentUser();
+    if (usuario == null || usuario.idPaciente == null) return;
+
+    final pacienteDoc = await _firestore
+        .collection('pacientes')
+        .doc(usuario.idPaciente)
+        .get();
+
+    if (pacienteDoc.exists) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsPacienteId, pacienteDoc.id);
+    }
+  }
+
+  Future<void> updateUserProfile({
+    String? displayName,
+    String? telefono,
+    String? photoURL,
+    String? rut,
+  }) async {
+    final usuario = await getCurrentUser();
+    if (usuario == null) {
+      throw AuthException('No hay usuario autenticado');
+    }
+
+    final updates = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (displayName != null) updates['displayName'] = displayName;
+    if (telefono != null) updates['telefono'] = telefono;
+    if (photoURL != null) updates['photoURL'] = photoURL;
+    if (rut != null) updates['rut'] = rut;
+
+    await _firestore.collection('usuarios').doc(usuario.id).update(updates);
+
+    final prefs = await SharedPreferences.getInstance();
+    if (displayName != null) {
+      await prefs.setString(_prefsDisplayName, displayName);
+    }
+    if (rut != null) {
+      await prefs.setString(_prefsRut, rut);
+    }
+  }
+
+  Future<void> updatePacienteData(Map<String, dynamic> data) async {
+    final paciente = await getCurrentPaciente();
+    if (paciente == null) {
+      throw AuthException('No existe ficha médica asociada');
+    }
+
+    data['updatedAt'] = FieldValue.serverTimestamp();
+
+    await _firestore.collection('pacientes').doc(paciente.id).update(data);
+  }
+
+  // Preferencias "Recordar sesión"
   Future<bool> getRememberMe() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyRememberMe) ?? false;
+    return prefs.getBool(_prefsRemember) ?? false;
   }
 
-  /// Obtener último email guardado
   Future<String?> getLastEmail() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyLastEmail);
+    return prefs.getString(_prefsLastEmail);
   }
 
-  /// Guardar preferencias de login
-  Future<void> _saveLoginPreferences(String email) async {
+  Future<void> _persistSession(
+    Usuario usuario,
+    Paciente paciente, {
+    String? token,
+    bool rememberMe = false,
+    String? emailForRemember,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyRememberMe, true);
-    await prefs.setString(_keyLastEmail, email);
+    await prefs.setString(_prefsUserId, usuario.id);
+    await prefs.setString(_prefsUserRole, usuario.rol);
+    await prefs.setString(_prefsDisplayName, usuario.displayName);
+    await prefs.setString(_prefsEmail, usuario.email);
+    await prefs.setString(_prefsRut, usuario.rut);
+    await prefs.setString(_prefsPacienteId, paciente.id ?? '');
+    if (token != null) {
+      await prefs.setString(_prefsAuthToken, token);
+    }
+
+    if (rememberMe && emailForRemember != null) {
+      await prefs.setBool(_prefsRemember, true);
+      await prefs.setString(_prefsLastEmail, emailForRemember);
+    } else {
+      await prefs.remove(_prefsRemember);
+      await prefs.remove(_prefsLastEmail);
+    }
   }
 
-  /// Limpiar preferencias de login
-  Future<void> _clearLoginPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_keyRememberMe);
-    await prefs.remove(_keyLastEmail);
-  }
-
-  // ========== MANEJO DE ERRORES ==========
-
-  /// Convertir excepciones de Firebase a mensajes legibles
   AuthException _handleFirebaseAuthException(
-      firebase_auth.FirebaseAuthException e) {
+    firebase_auth.FirebaseAuthException e,
+  ) {
     String message;
-    String code = e.code;
-
     switch (e.code) {
       case 'invalid-email':
         message = 'El correo electrónico no es válido';
@@ -319,9 +439,9 @@ class AuthService {
         break;
       default:
         message = 'Error de autenticación: ${e.message ?? e.code}';
+        break;
     }
 
-    return AuthException(message, code);
+    return AuthException(message, e.code);
   }
 }
-

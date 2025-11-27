@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../../models/paciente.dart';
 import '../../models/usuario.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
@@ -15,21 +17,27 @@ class PerfilPage extends StatefulWidget {
 
 class _PerfilPageState extends State<PerfilPage> {
   final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nombreController;
+  late TextEditingController _rutController;
   late TextEditingController _telefonoController;
   late TextEditingController _direccionController;
   late TextEditingController _previsionController;
   late TextEditingController _contactoEmergenciaController;
   late TextEditingController _telefonoEmergenciaController;
 
+  DateTime? _selectedDate;
+  String? _selectedSexo;
+
   bool _isEditing = false;
   bool _isSaving = false;
   bool _hasHydrated = false;
-  String? _lastUserId;
-  DateTime? _lastUpdatedAt;
+  String? _lastHydrationKey;
 
   @override
   void initState() {
     super.initState();
+    _nombreController = TextEditingController();
+    _rutController = TextEditingController();
     _telefonoController = TextEditingController();
     _direccionController = TextEditingController();
     _previsionController = TextEditingController();
@@ -39,6 +47,8 @@ class _PerfilPageState extends State<PerfilPage> {
 
   @override
   void dispose() {
+    _nombreController.dispose();
+    _rutController.dispose();
     _telefonoController.dispose();
     _direccionController.dispose();
     _previsionController.dispose();
@@ -50,19 +60,22 @@ class _PerfilPageState extends State<PerfilPage> {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    final usuario = authProvider.currentUser;
+    final pacienteCompleto = authProvider.pacienteCompleto;
 
-    if (usuario == null) {
+    if (pacienteCompleto == null) {
       return const Scaffold(
-        body: Center(child: Text('Error: Usuario no encontrado')),
+        body: Center(child: Text('Error: Información del paciente no disponible')),
       );
     }
 
-    _maybeHydrateControllers(usuario);
+    final usuario = pacienteCompleto.usuario;
+    final paciente = pacienteCompleto.paciente;
+
+    _maybeHydrateControllers(usuario, paciente);
 
     final showEmergencySection = _isEditing ||
-        usuario.contactoEmergencia != null ||
-        usuario.telefonoEmergencia != null;
+        paciente.contactoEmergenciaNombre != null ||
+        paciente.contactoEmergenciaTelefono != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -72,7 +85,7 @@ class _PerfilPageState extends State<PerfilPage> {
         actions: [
           if (_isEditing)
             TextButton(
-              onPressed: _isSaving ? null : () => _cancelEditing(usuario),
+              onPressed: _isSaving ? null : () => _cancelEditing(pacienteCompleto),
               child: const Text(
                 'Cancelar',
                 style: TextStyle(color: Colors.white),
@@ -102,15 +115,29 @@ class _PerfilPageState extends State<PerfilPage> {
                 _buildSection(
                   'Información Personal',
                   [
-                    _buildInfoTile(
-                      Icons.person_outline,
-                      'Nombre Completo',
-                      usuario.nombreCompleto,
+                    _buildInfoField(
+                      icon: Icons.person_outline,
+                      label: 'Nombre Completo',
+                      value: usuario.displayName,
+                      controller: _nombreController,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Ingresa tu nombre';
+                        }
+                        return null;
+                      },
                     ),
-                    _buildInfoTile(
-                      Icons.badge_outlined,
-                      'RUT',
-                      usuario.rut,
+                    _buildInfoField(
+                      icon: Icons.badge_outlined,
+                      label: 'RUT',
+                      value: usuario.rut,
+                      controller: _rutController,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Ingresa tu RUT';
+                        }
+                        return null;
+                      },
                     ),
                     _buildInfoTile(
                       Icons.email_outlined,
@@ -130,17 +157,16 @@ class _PerfilPageState extends State<PerfilPage> {
                         return null;
                       },
                     ),
-                    _buildInfoTile(
-                      Icons.cake_outlined,
-                      'Fecha de Nacimiento',
-                      usuario.fechaNacimiento != null
-                          ? _formatFecha(usuario.fechaNacimiento!)
-                          : 'No registrado',
+                    _buildDatePickerField(
+                      icon: Icons.cake_outlined,
+                      label: 'Fecha de Nacimiento',
+                      value: _selectedDate,
                     ),
-                    _buildInfoTile(
-                      Icons.wc_outlined,
-                      'Sexo',
-                      usuario.sexo ?? 'No registrado',
+                    _buildDropdownField(
+                      icon: Icons.wc_outlined,
+                      label: 'Sexo',
+                      value: _selectedSexo,
+                      items: ['Masculino', 'Femenino', 'Otro'],
                     ),
                   ],
                 ),
@@ -151,13 +177,15 @@ class _PerfilPageState extends State<PerfilPage> {
                     _buildInfoField(
                       icon: Icons.local_hospital_outlined,
                       label: 'Previsión',
-                      value: usuario.prevision ?? 'No registrado',
+                      value: paciente.prevision ?? 'No registrado',
                       controller: _previsionController,
                     ),
                     _buildInfoField(
                       icon: Icons.home_outlined,
                       label: 'Dirección',
-                      value: usuario.direccion ?? 'No registrado',
+                      value: paciente.direccion.isNotEmpty
+                          ? paciente.direccion
+                          : 'No registrado',
                       controller: _direccionController,
                     ),
                   ],
@@ -170,13 +198,14 @@ class _PerfilPageState extends State<PerfilPage> {
                       _buildInfoField(
                         icon: Icons.contact_emergency_outlined,
                         label: 'Nombre',
-                        value: usuario.contactoEmergencia ?? 'No registrado',
+                        value:
+                            paciente.contactoEmergenciaNombre ?? 'No registrado',
                         controller: _contactoEmergenciaController,
                       ),
                       _buildInfoField(
                         icon: Icons.phone_in_talk_outlined,
                         label: 'Teléfono',
-                        value: usuario.telefonoEmergencia ?? 'No registrado',
+                        value: paciente.contactoEmergenciaTelefono ?? 'No registrado',
                         controller: _telefonoEmergenciaController,
                         keyboardType: TextInputType.phone,
                       ),
@@ -189,7 +218,7 @@ class _PerfilPageState extends State<PerfilPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isSaving
                           ? null
-                          : () => _handleSave(authProvider, usuario),
+                          : () => _handleSave(authProvider, pacienteCompleto),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -257,48 +286,66 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  void _maybeHydrateControllers(Usuario usuario) {
-    final hasChanged =
-        _lastUserId != usuario.id || _lastUpdatedAt != usuario.updatedAt;
+  void _maybeHydrateControllers(Usuario usuario, Paciente paciente) {
+    if (_isEditing) return;
 
-    if (!_isEditing && !_hasHydrated) {
-      _fillControllers(usuario);
+    final hydrationKey = _composeHydrationKey(usuario, paciente);
+    if (!_hasHydrated || _lastHydrationKey != hydrationKey) {
+      _fillControllers(usuario, paciente);
+      _lastHydrationKey = hydrationKey;
       _hasHydrated = true;
-      return;
-    }
-
-    if (hasChanged && !_isEditing) {
-      _fillControllers(usuario);
     }
   }
 
-  void _fillControllers(Usuario usuario) {
+  String _composeHydrationKey(Usuario usuario, Paciente paciente) {
+    final userUpdated = usuario.updatedAt?.millisecondsSinceEpoch ?? 0;
+    final pacienteUpdated = paciente.updatedAt?.millisecondsSinceEpoch ?? 0;
+    return '${usuario.id}_${userUpdated}_${paciente.id}_$pacienteUpdated';
+  }
+
+  void _fillControllers(Usuario usuario, Paciente paciente) {
+    _nombreController.text = usuario.displayName;
+    _rutController.text = usuario.rut;
     _telefonoController.text = usuario.telefono;
-    _direccionController.text = usuario.direccion ?? '';
-    _previsionController.text = usuario.prevision ?? '';
-    _contactoEmergenciaController.text = usuario.contactoEmergencia ?? '';
-    _telefonoEmergenciaController.text = usuario.telefonoEmergencia ?? '';
-    _lastUserId = usuario.id;
-    _lastUpdatedAt = usuario.updatedAt;
+    _direccionController.text = paciente.direccion;
+    _previsionController.text = paciente.prevision ?? '';
+    _contactoEmergenciaController.text =
+        paciente.contactoEmergenciaNombre ?? '';
+    _telefonoEmergenciaController.text =
+        paciente.contactoEmergenciaTelefono ?? '';
+    
+    _selectedDate = paciente.fechaNacimiento;
+    _selectedSexo = paciente.sexo.isNotEmpty ? paciente.sexo : null;
   }
 
-  void _cancelEditing(Usuario usuario) {
+  void _cancelEditing(PacienteCompleto completo) {
     FocusScope.of(context).unfocus();
-    _fillControllers(usuario);
+    _fillControllers(completo.usuario, completo.paciente);
     setState(() {
       _isEditing = false;
       _isSaving = false;
+      _lastHydrationKey = _composeHydrationKey(
+        completo.usuario,
+        completo.paciente,
+      );
     });
   }
 
-  Future<void> _handleSave(AuthProvider authProvider, Usuario usuario) async {
+  Future<void> _handleSave(
+    AuthProvider authProvider,
+    PacienteCompleto completo,
+  ) async {
     if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
     setState(() => _isSaving = true);
 
     final success = await authProvider.updateProfile({
+      'displayName': _nombreController.text.trim(),
+      'rut': _rutController.text.trim(),
       'telefono': _telefonoController.text.trim(),
+      'fechaNacimiento': _selectedDate,
+      'sexo': _selectedSexo,
       'direccion': _emptyToNull(_direccionController.text),
       'prevision': _emptyToNull(_previsionController.text),
       'contactoEmergencia': _emptyToNull(_contactoEmergenciaController.text),
@@ -311,8 +358,12 @@ class _PerfilPageState extends State<PerfilPage> {
 
     if (success) {
       setState(() => _isEditing = false);
-      final refreshedUser = authProvider.currentUser ?? usuario;
-      _fillControllers(refreshedUser);
+      final refreshed = authProvider.pacienteCompleto ?? completo;
+      _fillControllers(refreshed.usuario, refreshed.paciente);
+      _lastHydrationKey = _composeHydrationKey(
+        refreshed.usuario,
+        refreshed.paciente,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Perfil actualizado correctamente'),
@@ -434,12 +485,12 @@ class _PerfilPageState extends State<PerfilPage> {
     );
   }
 
-  String _formatFecha(String fecha) {
+  String _formatFecha(DateTime? fecha) {
+    if (fecha == null) return 'No registrado';
     try {
-      final date = DateTime.parse(fecha);
-      return DateFormat('dd/MM/yyyy').format(date);
-    } catch (e) {
-      return fecha;
+      return DateFormat('dd/MM/yyyy').format(fecha);
+    } catch (_) {
+      return 'No registrado';
     }
   }
 
@@ -465,6 +516,83 @@ class _PerfilPageState extends State<PerfilPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDatePickerField({
+    required IconData icon,
+    required String label,
+    required DateTime? value,
+  }) {
+    if (_isEditing) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: InkWell(
+          onTap: !_isSaving
+              ? () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: value ?? DateTime.now(),
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setState(() => _selectedDate = picked);
+                  }
+                }
+              : null,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: label,
+              prefixIcon: Icon(icon),
+              border: const OutlineInputBorder(),
+            ),
+            child: Text(
+              _formatFecha(value),
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+    return _buildInfoTile(icon, label, _formatFecha(value));
+  }
+
+  Widget _buildDropdownField({
+    required IconData icon,
+    required String label,
+    required String? value,
+    required List<String> items,
+  }) {
+    if (_isEditing) {
+      // Ensure value is in items or null
+      final effectiveValue = (value != null && items.contains(value)) ? value : null;
+      
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: DropdownButtonFormField<String>(
+          value: effectiveValue,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon),
+            border: const OutlineInputBorder(),
+          ),
+          items: items
+              .map((item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  ))
+              .toList(),
+          onChanged: !_isSaving
+              ? (val) => setState(() => _selectedSexo = val)
+              : null,
+        ),
+      );
+    }
+    return _buildInfoTile(
+      icon,
+      label,
+      value != null && value.isNotEmpty ? value : 'No registrado',
     );
   }
 }

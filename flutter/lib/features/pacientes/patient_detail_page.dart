@@ -378,7 +378,8 @@ class PatientDetailPage extends StatelessWidget {
     }
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'No registrado';
     return DateFormat('dd/MM/yyyy').format(date);
   }
 

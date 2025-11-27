@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 
@@ -21,11 +21,17 @@ class _RegisterPageState extends State<RegisterPage> {
   final _telefonoController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _direccionController = TextEditingController();
+  final _previsionController = TextEditingController();
+  final _contactoEmergenciaNombreController = TextEditingController();
+  final _contactoEmergenciaTelefonoController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
   bool _acceptedTerms = false;
+  DateTime? _fechaNacimiento;
+  String? _sexo;
 
   @override
   void dispose() {
@@ -36,6 +42,10 @@ class _RegisterPageState extends State<RegisterPage> {
     _telefonoController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _direccionController.dispose();
+    _previsionController.dispose();
+    _contactoEmergenciaNombreController.dispose();
+    _contactoEmergenciaTelefonoController.dispose();
     super.dispose();
   }
 
@@ -54,7 +64,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     setState(() => _isLoading = true);
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = context.read<AuthProvider>();
     final success = await authProvider.signUp(
       email: _emailController.text.trim(),
       password: _passwordController.text,
@@ -62,23 +72,27 @@ class _RegisterPageState extends State<RegisterPage> {
       apellido: _apellidoController.text.trim(),
       rut: _rutController.text.trim(),
       telefono: _telefonoController.text.trim(),
+      fechaNacimiento: _fechaNacimiento,
+      sexo: _sexo,
+      direccion: _direccionController.text.trim(),
+      prevision: _previsionController.text.trim(),
+      contactoEmergenciaNombre: _contactoEmergenciaNombreController.text.trim(),
+      contactoEmergenciaTelefono: _contactoEmergenciaTelefonoController.text
+          .trim(),
     );
-
-    setState(() => _isLoading = false);
 
     if (!mounted) return;
 
+    setState(() => _isLoading = false);
+
     if (success) {
-      // Registro exitoso
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('¡Cuenta creada exitosamente!'),
           backgroundColor: Colors.green,
         ),
       );
-      // La navegación a home se maneja automáticamente por go_router
     } else {
-      // Error en registro
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage ?? 'Error al crear cuenta'),
@@ -86,6 +100,22 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       );
       authProvider.clearError();
+    }
+  }
+
+  Future<void> _pickFechaNacimiento() async {
+    final now = DateTime.now();
+    final initialDate =
+        _fechaNacimiento ?? DateTime(now.year - 18, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+
+    if (picked != null && mounted) {
+      setState(() => _fechaNacimiento = picked);
     }
   }
 
@@ -103,10 +133,7 @@ class _RegisterPageState extends State<RegisterPage> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              AppColors.primary,
-              AppColors.primaryLight,
-            ],
+            colors: [AppColors.primary, AppColors.primaryLight],
           ),
         ),
         child: SafeArea(
@@ -124,11 +151,9 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget _buildRegisterCard() {
     return Card(
       elevation: 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 500),
+        constraints: const BoxConstraints(maxWidth: 520),
         padding: const EdgeInsets.all(32.0),
         child: Form(
           key: _formKey,
@@ -136,16 +161,8 @@ class _RegisterPageState extends State<RegisterPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Datos Personales',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-              ),
+              _buildSectionTitle('Datos personales'),
               const SizedBox(height: 24),
-
-              // Nombre
               _buildTextField(
                 controller: _nombreController,
                 label: 'Nombre',
@@ -158,8 +175,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Apellido
               _buildTextField(
                 controller: _apellidoController,
                 label: 'Apellido',
@@ -172,8 +187,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // RUT
+              _buildDatePickerField(),
+              const SizedBox(height: 16),
+              _buildSexoDropdown(),
+              const SizedBox(height: 16),
               _buildTextField(
                 controller: _rutController,
                 label: 'RUT',
@@ -183,7 +200,6 @@ class _RegisterPageState extends State<RegisterPage> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Ingresa tu RUT';
                   }
-                  // Validación básica de formato RUT
                   if (!RegExp(r'^\d{7,8}-[\dkK]$').hasMatch(value.trim())) {
                     return 'Formato inválido (ej: 12345678-9)';
                   }
@@ -191,8 +207,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Teléfono
               _buildTextField(
                 controller: _telefonoController,
                 label: 'Teléfono',
@@ -206,26 +220,40 @@ class _RegisterPageState extends State<RegisterPage> {
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
-
-              // Divider
-              const Divider(),
               const SizedBox(height: 16),
-
-              Text(
-                'Credenciales de Acceso',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+              _buildTextField(
+                controller: _direccionController,
+                label: 'Dirección',
+                icon: Icons.location_on_outlined,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Ingresa tu dirección';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _previsionController,
+                label: 'Previsión (Isapre/Fonasa)',
+                hint: 'Ej: Fonasa',
+                icon: Icons.health_and_safety_outlined,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Indica tu previsión';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
-
-              // Email
+              const Divider(),
+              const SizedBox(height: 16),
+              _buildSectionTitle('Credenciales de acceso'),
+              const SizedBox(height: 24),
               _buildTextField(
                 controller: _emailController,
-                label: 'Correo Electrónico',
-                hint: 'ejemplo@email.com',
+                label: 'Correo electrónico',
+                hint: 'usuario@correo.com',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
@@ -239,8 +267,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Password
               _buildPasswordField(
                 controller: _passwordController,
                 label: 'Contraseña',
@@ -259,15 +285,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // Confirm Password
               _buildPasswordField(
                 controller: _confirmPasswordController,
-                label: 'Confirmar Contraseña',
+                label: 'Confirmar contraseña',
                 obscureText: _obscureConfirmPassword,
                 onToggleVisibility: () {
-                  setState(() =>
-                      _obscureConfirmPassword = !_obscureConfirmPassword);
+                  setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  );
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -280,21 +305,117 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // Terms and conditions
+              const Divider(),
+              const SizedBox(height: 16),
+              _buildSectionTitle('Contacto de emergencia'),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _contactoEmergenciaNombreController,
+                label: 'Nombre contacto',
+                icon: Icons.contact_emergency_outlined,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Ingresa un contacto de emergencia';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _contactoEmergenciaTelefonoController,
+                label: 'Teléfono contacto',
+                hint: '+56912345678',
+                icon: Icons.phone_in_talk_outlined,
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Ingresa el teléfono del contacto';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
               _buildTermsCheckbox(),
               const SizedBox(height: 24),
-
-              // Register button
               _buildRegisterButton(),
               const SizedBox(height: 16),
-
-              // Back to login
               _buildBackToLoginButton(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        fontWeight: FontWeight.bold,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+
+  Widget _buildDatePickerField() {
+    final localizations = MaterialLocalizations.of(context);
+    final label = _fechaNacimiento != null
+        ? localizations.formatMediumDate(_fechaNacimiento!)
+        : 'Selecciona tu fecha de nacimiento';
+
+    return FormField<DateTime>(
+      validator: (_) =>
+          _fechaNacimiento == null ? 'Selecciona tu fecha de nacimiento' : null,
+      builder: (state) {
+        return InkWell(
+          onTap: _isLoading
+              ? null
+              : () async {
+                  await _pickFechaNacimiento();
+                  state.didChange(_fechaNacimiento);
+                },
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'Fecha de nacimiento',
+              prefixIcon: const Icon(Icons.cake_outlined),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              errorText: state.errorText,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: _fechaNacimiento == null
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSexoDropdown() {
+    return DropdownButtonFormField<String>(
+      initialValue: _sexo,
+      decoration: InputDecoration(
+        labelText: 'Sexo',
+        prefixIcon: const Icon(Icons.wc_outlined),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      items: const [
+        DropdownMenuItem(value: 'femenino', child: Text('Femenino')),
+        DropdownMenuItem(value: 'masculino', child: Text('Masculino')),
+        DropdownMenuItem(value: 'otro', child: Text('Otro')),
+      ],
+      onChanged: _isLoading
+          ? null
+          : (value) {
+              setState(() => _sexo = value);
+            },
+      validator: (value) => value == null ? 'Selecciona una opción' : null,
     );
   }
 
@@ -314,9 +435,7 @@ class _RegisterPageState extends State<RegisterPage> {
         labelText: label,
         hintText: hint,
         prefixIcon: Icon(icon),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: validator,
     );
@@ -337,14 +456,10 @@ class _RegisterPageState extends State<RegisterPage> {
         labelText: label,
         prefixIcon: const Icon(Icons.lock_outlined),
         suffixIcon: IconButton(
-          icon: Icon(
-            obscureText ? Icons.visibility_off : Icons.visibility,
-          ),
+          icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
           onPressed: onToggleVisibility,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
       validator: validator,
     );
@@ -399,11 +514,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               )
             : const Text(
-                'Crear Cuenta',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Crear cuenta',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
       ),
     );

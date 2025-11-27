@@ -1,142 +1,190 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'usuario.dart';
 
-/// Modelo de Paciente que coincide con la estructura de Firestore
-/// y la versión Ionic del proyecto
+/// Modelo híbrido que mantiene compatibilidad con la estructura histórica de
+/// `pacientes` y los campos normalizados recientes.
 class Paciente {
   final String? id;
+  final String? idUsuario;
   final String rut;
   final String nombre;
   final String apellido;
-  final DateTime fechaNacimiento;
+  final DateTime? fechaNacimiento;
   final String direccion;
   final String telefono;
   final String? email;
-  final String sexo; // 'M', 'F', 'Otro'
+  final String sexo;
   final String? grupoSanguineo;
-  
-  // Campos adicionales para la UI
-  final String? estado; // 'activo', 'inactivo'
-  final String? estadoCivil; // 'soltero', 'casado', 'divorciado', 'viudo', 'union_libre'
-  final String? ocupacion;
-  final String? diagnostico;
-  
-  // Problem List
   final List<String>? alergias;
   final List<String>? enfermedadesCronicas;
+  final List<Map<String, dynamic>>? medicamentosActuales;
   final List<AlertaMedica>? alertasMedicas;
-  
-  // Para búsqueda mejorada
+  final Map<String, dynamic>? contactoEmergencia;
+  final String? prevision;
+  final String? numeroFicha;
+  final String? observaciones;
+  final String? estado;
+  final String? estadoCivil;
+  final String? ocupacion;
+  final String? diagnostico;
   final String? nombreCompleto;
-  
-  // Timestamps
+  final String? direccionSecundaria;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
-  Paciente({
+  const Paciente({
     this.id,
-    required this.rut,
-    required this.nombre,
-    required this.apellido,
-    required this.fechaNacimiento,
-    required this.direccion,
-    required this.telefono,
+    this.idUsuario,
+    this.rut = '',
+    this.nombre = '',
+    this.apellido = '',
+    this.fechaNacimiento,
+    this.direccion = '',
+    this.telefono = '',
     this.email,
-    required this.sexo,
+    this.sexo = 'No especificado',
     this.grupoSanguineo,
+    this.alergias,
+    this.enfermedadesCronicas,
+    this.medicamentosActuales,
+    this.alertasMedicas,
+    this.contactoEmergencia,
+    this.prevision,
+    this.numeroFicha,
+    this.observaciones,
     this.estado,
     this.estadoCivil,
     this.ocupacion,
     this.diagnostico,
-    this.alergias,
-    this.enfermedadesCronicas,
-    this.alertasMedicas,
     this.nombreCompleto,
+    this.direccionSecundaria,
     this.createdAt,
     this.updatedAt,
   });
 
-  /// Calcula la edad del paciente
+  /// Calcula la edad aproximada del paciente.
   int get edad {
+    final fecha = fechaNacimiento;
+    if (fecha == null) return 0;
     final now = DateTime.now();
-    int age = now.year - fechaNacimiento.year;
-    if (now.month < fechaNacimiento.month ||
-        (now.month == fechaNacimiento.month && now.day < fechaNacimiento.day)) {
+    int age = now.year - fecha.year;
+    if (now.month < fecha.month ||
+        (now.month == fecha.month && now.day < fecha.day)) {
       age--;
     }
     return age;
   }
 
-  /// Obtiene las iniciales del paciente
+  /// Devuelve las iniciales derivadas del nombre y apellido.
   String get iniciales {
     final n = nombre.isNotEmpty ? nombre[0].toUpperCase() : '';
     final a = apellido.isNotEmpty ? apellido[0].toUpperCase() : '';
-    return '$n$a';
+    return '$n$a'.trim();
   }
 
-  /// Convierte el modelo a Map para Firestore
+  /// Nombre completo preferido (usa campo dedicado o concatena nombre+apellido).
+  String get nombreParaMostrar {
+    final custom = nombreCompleto?.trim();
+    if (custom != null && custom.isNotEmpty) return custom;
+    return '$nombre $apellido'.trim();
+  }
+
+  String? get contactoEmergenciaNombre =>
+      contactoEmergencia?['nombre'] as String?;
+
+  String? get contactoEmergenciaTelefono =>
+      contactoEmergencia?['telefono'] as String?;
+
+  /// Conversión bidireccional con Firestore para soportar ambos modelos.
+  factory Paciente.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return Paciente(
+      id: doc.id,
+      idUsuario: data['idUsuario'],
+      rut: (data['rut'] ?? '').toString(),
+      nombre: (data['nombre'] ?? '').toString(),
+      apellido: (data['apellido'] ?? '').toString(),
+      fechaNacimiento: _asDate(data['fechaNacimiento']),
+      direccion: (data['direccion'] ?? '').toString(),
+      telefono: (data['telefono'] ?? '').toString(),
+      email: data['email']?.toString(),
+      sexo: (data['sexo'] ?? 'No especificado').toString(),
+      grupoSanguineo: data['grupoSanguineo']?.toString(),
+      alergias: data['alergias'] != null
+          ? List<String>.from(data['alergias'] as List)
+          : null,
+      enfermedadesCronicas: data['enfermedadesCronicas'] != null
+          ? List<String>.from(data['enfermedadesCronicas'] as List)
+          : null,
+        medicamentosActuales: data['medicamentosActuales'] != null
+          ? List<Map<String, dynamic>>.from(
+              (data['medicamentosActuales'] as List)
+                  .map((item) => Map<String, dynamic>.from(item as Map)),
+            )
+          : null,
+        alertasMedicas: data['alertasMedicas'] != null
+          ? (data['alertasMedicas'] as List)
+            .map((value) =>
+              AlertaMedica.fromMap(Map<String, dynamic>.from(value as Map)))
+            .toList()
+          : null,
+      contactoEmergencia: data['contactoEmergencia'] != null
+          ? Map<String, dynamic>.from(data['contactoEmergencia'] as Map)
+          : null,
+      prevision: data['prevision']?.toString(),
+      numeroFicha: data['numeroFicha']?.toString(),
+      observaciones: data['observaciones']?.toString(),
+      estado: data['estado']?.toString(),
+      estadoCivil: data['estadoCivil']?.toString(),
+      ocupacion: data['ocupacion']?.toString(),
+      diagnostico: data['diagnostico']?.toString(),
+      nombreCompleto: data['nombreCompleto']?.toString(),
+      direccionSecundaria: data['direccionSecundaria']?.toString(),
+      createdAt: _asDate(data['createdAt']),
+      updatedAt: _asDate(data['updatedAt']),
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
     return {
+      if (idUsuario != null) 'idUsuario': idUsuario,
       'rut': rut,
       'nombre': nombre,
       'apellido': apellido,
-      'fechaNacimiento': Timestamp.fromDate(fechaNacimiento),
+      if (fechaNacimiento != null)
+        'fechaNacimiento': Timestamp.fromDate(fechaNacimiento!),
       'direccion': direccion,
       'telefono': telefono,
       if (email != null) 'email': email,
       'sexo': sexo,
       if (grupoSanguineo != null) 'grupoSanguineo': grupoSanguineo,
+      if (alergias != null) 'alergias': alergias,
+      if (enfermedadesCronicas != null)
+        'enfermedadesCronicas': enfermedadesCronicas,
+      if (medicamentosActuales != null)
+        'medicamentosActuales': medicamentosActuales,
+      if (alertasMedicas != null)
+        'alertasMedicas': alertasMedicas!.map((a) => a.toMap()).toList(),
+      if (contactoEmergencia != null)
+        'contactoEmergencia': contactoEmergencia,
+      if (prevision != null) 'prevision': prevision,
+      if (numeroFicha != null) 'numeroFicha': numeroFicha,
+      if (observaciones != null) 'observaciones': observaciones,
       if (estado != null) 'estado': estado,
       if (estadoCivil != null) 'estadoCivil': estadoCivil,
       if (ocupacion != null) 'ocupacion': ocupacion,
       if (diagnostico != null) 'diagnostico': diagnostico,
-      if (alergias != null) 'alergias': alergias,
-      if (enfermedadesCronicas != null) 'enfermedadesCronicas': enfermedadesCronicas,
-      if (alertasMedicas != null)
-        'alertasMedicas': alertasMedicas!.map((a) => a.toMap()).toList(),
-      'nombreCompleto': '$nombre $apellido',
-      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
+      if (nombreCompleto != null) 'nombreCompleto': nombreCompleto,
+      if (direccionSecundaria != null)
+        'direccionSecundaria': direccionSecundaria,
       'updatedAt': Timestamp.fromDate(updatedAt ?? DateTime.now()),
+      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
     };
   }
 
-  /// Crea un modelo desde un documento de Firestore
-  factory Paciente.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
-    final data = doc.data()!;
-    return Paciente(
-      id: doc.id,
-      rut: data['rut'] ?? '',
-      nombre: data['nombre'] ?? '',
-      apellido: data['apellido'] ?? '',
-      fechaNacimiento: data['fechaNacimiento'] != null 
-          ? (data['fechaNacimiento'] as Timestamp).toDate()
-          : DateTime.now(),
-      direccion: data['direccion'] ?? '',
-      telefono: data['telefono'] ?? '',
-      email: data['email'],
-      sexo: data['sexo'] ?? 'Otro',
-      grupoSanguineo: data['grupoSanguineo'],
-      estado: data['estado'],
-      estadoCivil: data['estadoCivil'],
-      ocupacion: data['ocupacion'],
-      diagnostico: data['diagnostico'],
-      alergias: data['alergias'] != null ? List<String>.from(data['alergias']) : null,
-      enfermedadesCronicas: data['enfermedadesCronicas'] != null
-          ? List<String>.from(data['enfermedadesCronicas'])
-          : null,
-      alertasMedicas: data['alertasMedicas'] != null
-          ? (data['alertasMedicas'] as List)
-              .map((a) => AlertaMedica.fromMap(a as Map<String, dynamic>))
-              .toList()
-          : null,
-      nombreCompleto: data['nombreCompleto'],
-      createdAt: data['createdAt'] != null ? (data['createdAt'] as Timestamp).toDate() : null,
-      updatedAt: data['updatedAt'] != null ? (data['updatedAt'] as Timestamp).toDate() : null,
-    );
-  }
-
-  /// Crea una copia del modelo con campos actualizados
   Paciente copyWith({
     String? id,
+    String? idUsuario,
     String? rut,
     String? nombre,
     String? apellido,
@@ -146,19 +194,26 @@ class Paciente {
     String? email,
     String? sexo,
     String? grupoSanguineo,
+    List<String>? alergias,
+    List<String>? enfermedadesCronicas,
+    List<Map<String, dynamic>>? medicamentosActuales,
+    List<AlertaMedica>? alertasMedicas,
+    Map<String, dynamic>? contactoEmergencia,
+    String? prevision,
+    String? numeroFicha,
+    String? observaciones,
     String? estado,
     String? estadoCivil,
     String? ocupacion,
     String? diagnostico,
-    List<String>? alergias,
-    List<String>? enfermedadesCronicas,
-    List<AlertaMedica>? alertasMedicas,
     String? nombreCompleto,
+    String? direccionSecundaria,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
     return Paciente(
       id: id ?? this.id,
+      idUsuario: idUsuario ?? this.idUsuario,
       rut: rut ?? this.rut,
       nombre: nombre ?? this.nombre,
       apellido: apellido ?? this.apellido,
@@ -168,25 +223,63 @@ class Paciente {
       email: email ?? this.email,
       sexo: sexo ?? this.sexo,
       grupoSanguineo: grupoSanguineo ?? this.grupoSanguineo,
+      alergias: alergias ?? this.alergias,
+      enfermedadesCronicas: enfermedadesCronicas ?? this.enfermedadesCronicas,
+      medicamentosActuales: medicamentosActuales ?? this.medicamentosActuales,
+      alertasMedicas: alertasMedicas ?? this.alertasMedicas,
+      contactoEmergencia: contactoEmergencia ?? this.contactoEmergencia,
+      prevision: prevision ?? this.prevision,
+      numeroFicha: numeroFicha ?? this.numeroFicha,
+      observaciones: observaciones ?? this.observaciones,
       estado: estado ?? this.estado,
       estadoCivil: estadoCivil ?? this.estadoCivil,
       ocupacion: ocupacion ?? this.ocupacion,
       diagnostico: diagnostico ?? this.diagnostico,
-      alergias: alergias ?? this.alergias,
-      enfermedadesCronicas: enfermedadesCronicas ?? this.enfermedadesCronicas,
-      alertasMedicas: alertasMedicas ?? this.alertasMedicas,
       nombreCompleto: nombreCompleto ?? this.nombreCompleto,
+      direccionSecundaria: direccionSecundaria ?? this.direccionSecundaria,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  static DateTime? _asDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
 }
 
-/// Modelo de Alerta Médica
+/// View-model para combinar datos personales y médicos.
+class PacienteCompleto {
+  final Usuario usuario;
+  final Paciente paciente;
+
+  const PacienteCompleto({required this.usuario, required this.paciente});
+
+  String get displayName => usuario.displayName;
+  String get email => usuario.email;
+  String get rut => usuario.rut;
+  String get telefono => usuario.telefono;
+  String? get photoURL => usuario.photoURL;
+  bool get activo => usuario.activo;
+  String get rol => usuario.rol;
+  String get idUsuario => usuario.id;
+  String get idPaciente => paciente.id ?? '';
+  DateTime? get fechaNacimiento => paciente.fechaNacimiento;
+  String? get grupoSanguineo => paciente.grupoSanguineo;
+  List<String>? get alergias => paciente.alergias;
+  List<String>? get enfermedades => paciente.enfermedadesCronicas;
+  Map<String, dynamic>? get contactoEmergencia => paciente.contactoEmergencia;
+  String? get prevision => paciente.prevision;
+  String get direccion => paciente.direccion;
+  String get sexo => paciente.sexo;
+}
+
+/// Modelo auxiliar reutilizado por pantallas heredadas (alertas médicas).
 class AlertaMedica {
-  final String tipo; // 'alergia', 'enfermedad_cronica', 'medicamento_critico', 'otro'
+  final String tipo;
   final String descripcion;
-  final String severidad; // 'baja', 'media', 'alta', 'critica'
+  final String severidad;
   final DateTime fechaRegistro;
 
   AlertaMedica({
