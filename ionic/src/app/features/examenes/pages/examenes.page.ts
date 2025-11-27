@@ -85,7 +85,7 @@ export class ExamenesPage implements OnInit, OnDestroy {
       this.route.queryParams.subscribe(params => {
         this.patientId = params['patientId'];
         if (this.patientId) {
-          this.loadExams(this.patientId);
+          // Solo cargar paciente, que a su vez cargará los exámenes con el ID correcto
           this.loadPacienteData(this.patientId);
         } else {
           this.error = 'No se especificó el ID del paciente';
@@ -98,13 +98,20 @@ export class ExamenesPage implements OnInit, OnDestroy {
   }
 
   /**
-   * Load patient data
+   * Load patient data and store correct idPaciente
    */
   loadPacienteData(pacienteId: string) {
     this.subscriptions.push(
       this.pacientesService.getPacienteById(pacienteId).subscribe({
         next: (paciente) => {
           this.paciente = paciente || null;
+          // IMPORTANTE: Actualizar patientId con el idPaciente correcto
+          if (paciente && paciente.idPaciente) {
+            this.patientId = paciente.idPaciente;
+            console.log('📋 Examenes - Using correct idPaciente:', this.patientId);
+            // Recargar exámenes con el ID correcto
+            this.loadExams(this.patientId);
+          }
         },
         error: (error) => {
           console.error('Error loading patient:', error);

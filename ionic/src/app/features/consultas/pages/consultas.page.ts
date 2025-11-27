@@ -260,16 +260,36 @@ export class ConsultasPage implements OnInit, OnDestroy {
     this.error = null;
 
     try {
-      // Load all data using Promise.all with firstValueFrom - ensures completion
-      const [paciente, ficha, consultas, examenes] = await Promise.all([
-        firstValueFrom(this.pacientesService.getPacienteById(patientId)),
-        firstValueFrom(this.fichasMedicasService.getFichaByPacienteId(patientId)),
-        firstValueFrom(this.consultasService.getConsultasByPaciente(patientId)),
-        firstValueFrom(this.examenesService.getOrdenesByPaciente(patientId))
+      // Load patient first to get the correct idPaciente
+      const paciente = await firstValueFrom(this.pacientesService.getPacienteById(patientId));
+      
+      if (!paciente) {
+        this.error = 'No se encontró el paciente';
+        this.isLoading = false;
+        return;
+      }
+
+      // IMPORTANTE: Usar idPaciente del paciente cargado para todas las operaciones
+      const idPacienteReal = paciente.idPaciente;
+      console.log('🔍 Loading data for patient:', {
+        receivedId: patientId,
+        idPaciente: idPacienteReal,
+        idUsuario: paciente.id,
+        displayName: paciente.displayName
+      });
+
+      // Actualizar patientId con el ID correcto del documento paciente
+      this.patientId = idPacienteReal;
+
+      // Load all other data using the correct idPaciente
+      const [ficha, consultas, examenes] = await Promise.all([
+        firstValueFrom(this.fichasMedicasService.getFichaByPacienteId(idPacienteReal)),
+        firstValueFrom(this.consultasService.getConsultasByPaciente(idPacienteReal)),
+        firstValueFrom(this.examenesService.getOrdenesByPaciente(idPacienteReal))
       ]);
 
-      if (!paciente || !ficha) {
-        this.error = 'No se encontró el paciente o su ficha médica';
+      if (!ficha) {
+        this.error = 'No se encontró la ficha médica del paciente';
         this.isLoading = false;
         return;
       }
@@ -506,17 +526,28 @@ export class ConsultasPage implements OnInit, OnDestroy {
    */
   private async guardarConsulta(consultaData: any) {
     try {
+      console.log('💾 Guardando consulta con data:', {
+        idPaciente: consultaData.idPaciente,
+        motivo: consultaData.motivo,
+        fecha: consultaData.fecha
+      });
+      
       const consultaId = await this.consultasService.createConsulta(consultaData);
+      console.log('✅ Consulta guardada con ID:', consultaId);
+      
       await this.showToast('Consulta guardada exitosamente', 'success');
       
       // Reload consultas using async/await (no subscriptions)
       if (this.patientId && this.ficha && this.paciente) {
+        console.log('🔄 Recargando consultas para paciente:', this.patientId);
         this.isLoading = true;
         
         try {
           const consultas = await firstValueFrom(
             this.consultasService.getConsultasByPaciente(this.patientId)
           );
+          
+          console.log('📋 Consultas cargadas:', consultas.length, consultas);
           
           // Update consultas section of ficha
           if (this.ficha) {
@@ -2279,16 +2310,21 @@ export class ConsultasPage implements OnInit, OnDestroy {
       return;
     }
     
+    // IMPORTANTE: Usar this.patientId (que es el idPaciente correcto) y nombres de campo correctos
     const consultaData = {
-      pacienteId: this.paciente?.id,
-      fichaMedicaId: this.fichaId,
+      idPaciente: this.patientId!, // ID del documento en colección 'pacientes'
+      idProfesional: 'system', // TODO: obtener del usuario logueado
+      idFichaMedica: this.fichaId!,
       fecha: Timestamp.fromDate(new Date(this.datosNuevaConsulta.fechaConsulta)),
-      motivoConsulta: this.datosNuevaConsulta.motivoConsulta,
-      diagnostico: this.datosNuevaConsulta.diagnostico,
+      motivo: this.datosNuevaConsulta.motivoConsulta, // campo correcto: 'motivo' no 'motivoConsulta'
       tratamiento: this.datosNuevaConsulta.tratamiento,
+      observaciones: this.datosNuevaConsulta.observaciones,
       signosVitales: this.datosNuevaConsulta.signosVitales,
-      observaciones: this.datosNuevaConsulta.observaciones
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
     };
+    
+    console.log('💾 Guardando consulta:', consultaData);
     
     await this.guardarConsulta(consultaData);
     this.cerrarPopupConsulta();
