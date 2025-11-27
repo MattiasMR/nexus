@@ -16,6 +16,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import TabsRoot from '@/components/ui/tabs.vue';
+import { TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs.vue';
 import {
     Dialog,
     DialogContent,

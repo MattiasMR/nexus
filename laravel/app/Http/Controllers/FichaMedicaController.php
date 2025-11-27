@@ -7,7 +7,7 @@ use App\Models\Paciente;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf as PDF;
 
 class FichaMedicaController extends Controller
 {
@@ -344,7 +344,7 @@ class FichaMedicaController extends Controller
                 'fecha' => now()->format('d/m/Y'),
             ];
 
-            $pdf = Pdf::loadView('pdf.ficha-medica', $data);
+            $pdf = PDF::loadView('pdf.ficha-medica', $data);
             
             $nombreArchivo = 'ficha_medica_' . ($usuario['rut'] ?? 'sin_rut') . '_' . now()->format('Y-m-d') . '.pdf';
 
