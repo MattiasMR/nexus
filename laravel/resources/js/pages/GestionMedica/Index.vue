@@ -136,7 +136,7 @@ const getInitials = (name: string) => {
 
             <!-- Stats Cards -->
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-                <Card class="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-background">
+                <Card class="border-l-4 border-l-blue-500 **bg-gradient-to-br from-blue-500/90 to-blue-600/90** **text-white**">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Total Pacientes</CardTitle>
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
@@ -149,7 +149,7 @@ const getInitials = (name: string) => {
                     </CardContent>
                 </Card>
 
-                <Card class="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-background">
+                <Card class="border-l-4 border-l-green-500 **bg-gradient-to-br from-green-500/90 to-green-600/90** **text-white**">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Con Ficha Médica</CardTitle>
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100">
@@ -164,7 +164,7 @@ const getInitials = (name: string) => {
                     </CardContent>
                 </Card>
 
-                <Card class="border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-background">
+                <Card class="border-l-4 border-l-amber-500 **bg-gradient-to-br from-amber-500/90 to-amber-600/90** **text-white**">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Sin Ficha Médica</CardTitle>
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
@@ -177,7 +177,7 @@ const getInitials = (name: string) => {
                     </CardContent>
                 </Card>
 
-                <Card class="border-l-4 border-l-red-500 bg-gradient-to-br from-red-50 to-background">
+                <Card class="border-l-4 border-l-red-500 **bg-gradient-to-br from-red-500/90 to-red-600/90** **text-white**">
                     <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle class="text-sm font-medium">Con Alergias</CardTitle>
                         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">

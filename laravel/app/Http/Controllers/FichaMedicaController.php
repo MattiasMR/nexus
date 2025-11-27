@@ -7,7 +7,7 @@ use App\Models\Paciente;
 use App\Models\Usuario;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf as PDF;
 
 class FichaMedicaController extends Controller
 {
@@ -157,24 +157,28 @@ class FichaMedicaController extends Controller
     public function show(string $idPaciente)
     {
         try {
-            logger()->info('🔵 Mostrando ficha médica del paciente', ['idPaciente' => $idPaciente]);
+            logger()->info('🔵 [1/7] Iniciando carga de ficha médica', ['idPaciente' => $idPaciente]);
 
             $pacienteModel = new Paciente();
             $usuarioModel = new Usuario();
             $fichaModel = new FichaMedica();
 
             // Obtener datos del paciente
+            logger()->info('📋 [2/7] Obteniendo datos del paciente...');
             $paciente = $pacienteModel->find($idPaciente);
+            logger()->info('✅ Paciente obtenido', ['encontrado' => !is_null($paciente)]);
             if (!$paciente) {
                 return redirect()->route('gestion-medica.index')
                     ->with('error', 'Paciente no encontrado');
             }
 
             // Obtener datos del usuario
+            logger()->info('👤 [3/7] Obteniendo datos del usuario...', ['idUsuario' => $paciente['idUsuario'] ?? 'no especificado']);
             $usuario = null;
             if (isset($paciente['idUsuario'])) {
                 $usuario = $usuarioModel->find($paciente['idUsuario']);
             }
+            logger()->info('✅ Usuario obtenido', ['encontrado' => !is_null($usuario)]);
 
             if (!$usuario) {
                 return redirect()->route('gestion-medica.index')
@@ -182,7 +186,9 @@ class FichaMedicaController extends Controller
             }
 
             // Obtener ficha médica
+            logger()->info('📄 [4/7] Obteniendo ficha médica...');
             $fichaMedica = $fichaModel->findByPaciente($idPaciente);
+            logger()->info('✅ Ficha obtenida', ['encontrada' => !is_null($fichaMedica)]);
 
             // Si no tiene ficha, crear una vacía
             if (!$fichaMedica) {
@@ -204,6 +210,69 @@ class FichaMedicaController extends Controller
                 $fichaMedica = $fichaModel->find($fichaId);
             }
 
+            // Obtener consultas del paciente
+            logger()->info('💊 [5/7] Obteniendo consultas del paciente...');
+            $firestore = app('firebase.firestore');
+            
+            $consultas = [];
+            try {
+                $consultasRef = $firestore->database()->collection('consultas')
+                    ->where('idPaciente', '=', $idPaciente);
+                logger()->info('🔍 Ejecutando query de consultas...');
+                $consultasSnapshot = $consultasRef->documents();
+                
+                foreach ($consultasSnapshot as $doc) {
+                    if ($doc->exists()) {
+                        $consultas[] = $doc->data();
+                    }
+                }
+                
+                // Ordenar manualmente por fecha
+                usort($consultas, function($a, $b) {
+                    $fechaA = $a['fecha'] ?? null;
+                    $fechaB = $b['fecha'] ?? null;
+                    if (!$fechaA || !$fechaB) return 0;
+                    return $fechaB <=> $fechaA; // Descendente
+                });
+                logger()->info('✅ Consultas obtenidas', ['cantidad' => count($consultas)]);
+            } catch (\Exception $e) {
+                logger()->error('❌ Error obteniendo consultas', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+
+            // Obtener órdenes de examen del paciente
+            logger()->info('🔬 [6/7] Obteniendo órdenes de examen...');
+            $ordenesExamen = [];
+            try {
+                $examenesRef = $firestore->database()->collection('ordenes-examen')
+                    ->where('idPaciente', '=', $idPaciente);
+                logger()->info('🔍 Ejecutando query de órdenes-examen...');
+                $examenesSnapshot = $examenesRef->documents();
+                
+                foreach ($examenesSnapshot as $doc) {
+                    if ($doc->exists()) {
+                        $ordenesExamen[] = $doc->data();
+                    }
+                }
+                
+                // Ordenar manualmente por fecha
+                usort($ordenesExamen, function($a, $b) {
+                    $fechaA = $a['fecha'] ?? null;
+                    $fechaB = $b['fecha'] ?? null;
+                    if (!$fechaA || !$fechaB) return 0;
+                    return $fechaB <=> $fechaA; // Descendente
+                });
+                logger()->info('✅ Órdenes de examen obtenidas', ['cantidad' => count($ordenesExamen)]);
+            } catch (\Exception $e) {
+                logger()->error('❌ Error obteniendo órdenes de examen', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+            }
+
+            logger()->info('🎨 [7/7] Preparando datos para renderizar...');
             $datosCompletos = [
                 // Datos del usuario
                 'usuario' => [
@@ -226,17 +295,27 @@ class FichaMedicaController extends Controller
                 
                 // Ficha médica
                 'ficha' => $fichaMedica,
+                
+                // Consultas y exámenes
+                'consultas' => $consultas,
+                'ordenesExamen' => $ordenesExamen,
             ];
 
             logger()->info('✅ Ficha médica cargada', ['idFicha' => $fichaMedica['id']]);
+            logger()->info('🚀 Renderizando vista GestionMedica/Show...');
 
             return Inertia::render('GestionMedica/Show', $datosCompletos);
 
         } catch (\Exception $e) {
-            logger()->error('❌ Error mostrando ficha médica: ' . $e->getMessage());
+            logger()->error('💥 ERROR CRÍTICO en show()', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
             
             return redirect()->route('gestion-medica.index')
-                ->with('error', 'Error al cargar la ficha médica');
+                ->with('error', 'Error al cargar la ficha médica: ' . $e->getMessage());
         }
     }
 
@@ -344,7 +423,7 @@ class FichaMedicaController extends Controller
                 'fecha' => now()->format('d/m/Y'),
             ];
 
-            $pdf = Pdf::loadView('pdf.ficha-medica', $data);
+            $pdf = PDF::loadView('pdf.ficha-medica', $data);
             
             $nombreArchivo = 'ficha_medica_' . ($usuario['rut'] ?? 'sin_rut') . '_' . now()->format('Y-m-d') . '.pdf';
 

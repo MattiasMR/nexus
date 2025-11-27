@@ -79,6 +79,11 @@ class FirebaseServiceProvider extends ServiceProvider
         $this->app->singleton(Storage::class, function ($app) {
             return $app->make(Factory::class)->createStorage();
         });
+
+        // Registrar alias para acceso fácil
+        $this->app->alias(Firestore::class, 'firebase.firestore');
+        $this->app->alias(Auth::class, 'firebase.auth');
+        $this->app->alias(Storage::class, 'firebase.storage');
     }
 
     /**
