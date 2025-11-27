@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'radix-vue';
+import { TabsRoot } from 'radix-vue';
 import { cn } from '@/lib/utils';
 import { computed } from 'vue';
 
@@ -24,7 +24,3 @@ const delegatedProps = computed(() => {
         <slot />
     </TabsRoot>
 </template>
-
-<script lang="ts">
-export { TabsList, TabsTrigger, TabsContent };
-</script>

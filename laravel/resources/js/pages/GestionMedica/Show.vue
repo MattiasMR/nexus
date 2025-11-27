@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import TabsRoot from '@/components/ui/tabs.vue';
-import { TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs.vue';
+import { TabsList, TabsTrigger, TabsContent } from 'radix-vue';
 import {
     Dialog,
     DialogContent,
@@ -40,8 +40,22 @@ import {
     Activity,
     AlertCircle,
     Plus,
-    X
+    X,
+    Stethoscope,
+    ClipboardList,
+    Search,
+    Eye,
+    Edit,
+    Upload
 } from 'lucide-vue-next';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { type BreadcrumbItem } from '@/types';
 
 interface Usuario {
@@ -87,9 +101,14 @@ interface Props {
     usuario: Usuario;
     paciente: Paciente;
     ficha: FichaMedica;
+    consultas?: any[];
+    ordenesExamen?: any[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+    consultas: () => [],
+    ordenesExamen: () => [],
+});
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Gestión Médica', href: '/gestion-medica' },
@@ -244,6 +263,33 @@ const formatearFecha = (fecha: string | null) => {
                 </div>
             </div>
 
+            <!-- Sistema de Pestañas -->
+            <TabsRoot default-value="ficha" class="w-full mt-6">
+                <TabsList class="grid w-full grid-cols-4 mb-6">
+                    <TabsTrigger value="ficha" class="flex items-center gap-2">
+                        <FileText class="h-4 w-4" />
+                        <span class="hidden sm:inline">Ficha Médica</span>
+                        <span class="sm:hidden">Ficha</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="consultas" class="flex items-center gap-2">
+                        <Stethoscope class="h-4 w-4" />
+                        <span class="hidden sm:inline">Consultas ({{ ficha.totalConsultas }})</span>
+                        <span class="sm:hidden">Consultas</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="examenes" class="flex items-center gap-2">
+                        <ClipboardList class="h-4 w-4" />
+                        <span class="hidden sm:inline">Exámenes ({{ ordenesExamen.length }})</span>
+                        <span class="sm:hidden">Exámenes</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="diagnosticos" class="flex items-center gap-2">
+                        <Activity class="h-4 w-4" />
+                        <span class="hidden sm:inline">Diagnósticos</span>
+                        <span class="sm:hidden">Diag.</span>
+                    </TabsTrigger>
+                </TabsList>
+
+                <!-- TAB: Ficha Médica -->
+                <TabsContent value="ficha">
             <div class="grid gap-6 md:grid-cols-3">
                 <!-- Columna izquierda: Información del paciente -->
                 <div class="space-y-6">
@@ -501,6 +547,209 @@ const formatearFecha = (fecha: string | null) => {
                     </form>
                 </div>
             </div>
+                </TabsContent>
+
+                <!-- TAB: Consultas -->
+                <TabsContent value="consultas">
+                    <Card>
+                        <CardHeader class="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Historial de Consultas</CardTitle>
+                                <CardDescription>
+                                    Registro completo de las consultas médicas del paciente
+                                </CardDescription>
+                            </div>
+                            <Button size="sm">
+                                <Plus class="h-4 w-4 mr-2" />
+                                Nueva Consulta
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div v-if="consultas.length === 0" class="text-center py-12">
+                                <Stethoscope class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                <p class="text-muted-foreground">No hay consultas registradas</p>
+                            </div>
+                            <div v-else class="space-y-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Fecha</TableHead>
+                                            <TableHead>Profesional</TableHead>
+                                            <TableHead>Diagnóstico</TableHead>
+                                            <TableHead>Receta</TableHead>
+                                            <TableHead class="text-right">Acciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="consulta in consultas" :key="consulta.id">
+                                            <TableCell>
+                                                {{ formatearFecha(consulta.fecha) }}
+                                            </TableCell>
+                                            <TableCell>
+                                                {{ consulta.nombreProfesional || 'Sin asignar' }}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div class="max-w-xs truncate">
+                                                    {{ consulta.diagnostico || 'Sin diagnóstico' }}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge v-if="consulta.receta" variant="outline">
+                                                    Con receta
+                                                </Badge>
+                                                <span v-else class="text-muted-foreground text-sm">
+                                                    Sin receta
+                                                </span>
+                                            </TableCell>
+                                            <TableCell class="text-right">
+                                                <div class="flex justify-end gap-2">
+                                                    <Button size="sm" variant="ghost">
+                                                        <Eye class="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost">
+                                                        <Edit class="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost">
+                                                        <Trash2 class="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <!-- TAB: Exámenes -->
+                <TabsContent value="examenes">
+                    <Card>
+                        <CardHeader class="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Órdenes de Examen</CardTitle>
+                                <CardDescription>
+                                    Resultados y documentos de exámenes médicos
+                                </CardDescription>
+                            </div>
+                            <Button size="sm">
+                                <Plus class="h-4 w-4 mr-2" />
+                                Nueva Orden
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div v-if="ordenesExamen.length === 0" class="text-center py-12">
+                                <ClipboardList class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                <p class="text-muted-foreground">No hay exámenes registrados</p>
+                            </div>
+                            <div v-else class="space-y-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Fecha</TableHead>
+                                            <TableHead>Estado</TableHead>
+                                            <TableHead>Exámenes</TableHead>
+                                            <TableHead>Documentos</TableHead>
+                                            <TableHead class="text-right">Acciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow v-for="orden in ordenesExamen" :key="orden.id">
+                                            <TableCell>
+                                                {{ formatearFecha(orden.fecha) }}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge :variant="orden.estado === 'realizado' ? 'default' : 'secondary'">
+                                                    {{ orden.estado }}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div class="space-y-1">
+                                                    <div v-for="examen in orden.examenes" :key="examen.idExamen" class="text-sm">
+                                                        {{ examen.nombreExamen }}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div class="flex gap-1">
+                                                    <Badge v-for="(examen, idx) in orden.examenes" :key="idx" variant="outline" class="text-xs">
+                                                        {{ examen.documentos?.length || 0 }} docs
+                                                    </Badge>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell class="text-right">
+                                                <div class="flex justify-end gap-2">
+                                                    <Button size="sm" variant="ghost">
+                                                        <Eye class="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost">
+                                                        <Edit class="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost">
+                                                        <Trash2 class="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <!-- TAB: Diagnósticos -->
+                <TabsContent value="diagnosticos">
+                    <div class="space-y-6">
+                        <!-- Diagnóstico Principal -->
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Diagnóstico Principal</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div class="prose prose-sm max-w-none">
+                                    <p class="whitespace-pre-wrap">
+                                        {{ ficha.observacion || 'Sin diagnóstico principal registrado' }}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <!-- Diagnósticos por Consulta -->
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Diagnósticos por Consulta</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div v-if="consultas.length === 0" class="text-center py-12">
+                                    <Activity class="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                                    <p class="text-muted-foreground">No hay diagnósticos registrados</p>
+                                </div>
+                                <div v-else class="space-y-4">
+                                    <div v-for="consulta in consultas" :key="consulta.id" 
+                                         class="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                                        <div class="flex items-start justify-between mb-2">
+                                            <div>
+                                                <div class="font-medium">{{ formatearFecha(consulta.fecha) }}</div>
+                                                <div class="text-sm text-muted-foreground">
+                                                    Por: {{ consulta.nombreProfesional || 'Sin asignar' }}
+                                                </div>
+                                            </div>
+                                            <Badge variant="outline">Consulta</Badge>
+                                        </div>
+                                        <Separator class="my-3" />
+                                        <div class="prose prose-sm max-w-none">
+                                            <p class="whitespace-pre-wrap">
+                                                {{ consulta.diagnostico || 'Sin diagnóstico' }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+            </TabsRoot>
         </div>
     </AppLayout>
 </template>
